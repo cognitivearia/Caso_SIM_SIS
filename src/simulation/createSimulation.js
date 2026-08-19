@@ -2,13 +2,22 @@ import * as THREE from 'three/webgpu';
 import {
   Fn,
   If,
+  acos,
+  atan,
+  clamp,
   color,
+  cos,
+  exp,
+  float,
   hash,
   instanceIndex,
   instancedArray,
   max,
   mix,
-  mod,
+  pow,
+  sin,
+  smoothstep,
+  sqrt,
   step,
   uint,
   uv,
@@ -17,13 +26,9 @@ import {
 } from 'three/tsl';
 
 export function createSimulation({ renderer, scene, params, count = 131072 }) {
-  // STATE -----------------------------------------------------------------
-  // Each particle owns position and velocity. The arrays live in GPU storage.
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
 
-  // INITIALIZATION --------------------------------------------------------
-  // A compute pass writes the initial state for every particle in parallel.
   const initParticles = Fn(() => {
     const i = instanceIndex;
     const p = positionBuffer.element(i);
@@ -31,18 +36,22 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
     const r1 = hash(i.add(uint(11)));
     const r2 = hash(i.add(uint(23)));
-    const r3 = hash(i.add(uint(37)));
-    const r4 = hash(i.add(uint(53)));
-    const r5 = hash(i.add(uint(71)));
-    const r6 = hash(i.add(uint(89)));
+    const r3 = hash(i.add(uint(97)));
 
-    p.assign(vec3(r1, r2, r3).sub(0.5).mul(params.boundsSize.mul(0.45)));
-    v.assign(vec3(r4, r5, r6).sub(0.5).mul(params.initialSpeed));
-  })().compute(count).setName('Initialize Particles');
+    const theta = r1.mul(6.28318530718);
+    const cosPhi = r2.mul(2.0).sub(1.0);
+    const sinPhi = sqrt(max(float(1.0).sub(cosPhi.pow(2)), 0.001));
+    const jitter = r3.sub(0.5).mul(params.orbThickness);
+    const radius = params.orbRadius.add(jitter);
 
-  // UPDATE / COMPUTE SHADER ----------------------------------------------
-  // This is the conceptual heart of the project:
-  // state -> forces -> acceleration -> velocity -> position.
+    p.assign(vec3(
+      sinPhi.mul(cos(theta)),
+      sinPhi.mul(sin(theta)),
+      cosPhi
+    ).mul(radius));
+    v.assign(vec3(0.0, 0.0, 0.0));
+  })().compute(count).setName('Initialize Orb Particles');
+
   const updateParticles = Fn(() => {
     const p = positionBuffer.element(instanceIndex);
     const v = velocityBuffer.element(instanceIndex);
@@ -50,29 +59,41 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    // 1) CONSTANT / WIND FORCE
-    force.addAssign(params.wind.mul(params.windEnabled));
+    const dist = max(p.length(), 0.001);
+    const dir = p.div(dist);
 
-    // 2) RADIAL FORCE (positive = attraction, negative = repulsion)
-    const toAttractor = params.attractor.sub(p);
-    const distance = max(toAttractor.length(), params.softening);
-    const radialDirection = toAttractor.div(distance);
-    const radialForce = radialDirection
-      .mul(params.radialStrength)
-      .div(distance.pow(2))
-      .mul(params.radialEnabled);
-    force.addAssign(radialForce);
+    // Resorte hacia la cáscara del orbe (mantiene la forma esférica)
+    const shellError = dist.sub(params.orbRadius);
+    force.addAssign(dir.mul(shellError).mul(params.orbSpringStrength).mul(-1.0));
 
-    // 3) VORTEX FORCE: tangent to the radial direction around Z.
-    const zAxis = vec3(0.0, 0.0, 1.0);
-    const tangent = zAxis.cross(radialDirection);
-    force.addAssign(tangent.mul(params.vortexStrength).mul(params.vortexEnabled));
+    // Actor 1 · Maza: picos radiales en el exterior del orbe
+    const shellMask = smoothstep(params.orbRadius.mul(0.9), params.orbRadius.mul(1.02), dist)
+      .mul(smoothstep(params.orbRadius.mul(1.2), params.orbRadius.mul(1.0), dist));
 
-    // 4) LINEAR DRAG: F = -c v
+    const theta = atan(dir.y, dir.x);
+    const phi = acos(clamp(dir.z, -1.0, 1.0));
+    const spikeA = sin(theta.mul(params.maceSpikeCount));
+    const spikeB = sin(phi.mul(params.maceSpikeCount.mul(0.5)));
+    const spikePattern = pow(max(spikeA.mul(spikeB), 0.0), params.maceSharpness);
+
+    force.addAssign(
+      dir.mul(spikePattern).mul(params.maceStrength).mul(params.maceEnabled).mul(shellMask)
+    );
+
+    // Actor 2 · Ondas en X desde el centro
+    const wavePhase = params.waveFrequency.mul(p.x).sub(params.time.mul(params.waveSpeed));
+    const waveVal = sin(wavePhase);
+    const yzDistSq = p.y.mul(p.y).add(p.z.mul(p.z));
+    const falloff = exp(yzDistSq.mul(-0.3));
+
+    force.addAssign(
+      vec3(waveVal, 0.0, 0.0).mul(params.waveStrength).mul(params.waveEnabled).mul(falloff)
+    );
+
+    // Drag lineal
     force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
 
-    // INTEGRATION ---------------------------------------------------------
-    // Unit mass: a = F. Semi-implicit Euler: update v, then p.
+    // Integración
     v.addAssign(force.mul(dt));
 
     const speed = v.length();
@@ -81,14 +102,8 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     });
 
     p.addAssign(v.mul(dt));
+  })().compute(count).setName('Update Orb Particles');
 
-    // Periodic boundary conditions: particles leaving one side re-enter.
-    const half = params.boundsSize.mul(0.5);
-    p.assign(mod(p.add(half), params.boundsSize).sub(half));
-  })().compute(count).setName('Update Particles');
-
-  // RENDER ---------------------------------------------------------------
-  // Rendering does not recompute the physics. It consumes the GPU state.
   const material = new THREE.SpriteNodeMaterial({
     blending: THREE.AdditiveBlending,
     depthWrite: false,
@@ -100,13 +115,16 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
 
   material.colorNode = Fn(() => {
     const speed = velocityBuffer.toAttribute().length();
-    const t = speed.div(params.maxSpeed).clamp(0.0, 1.0);
-    const slow = color('#46a6ff');
-    const fast = color('#ffb35a');
-    return vec4(mix(slow, fast, t), 1.0);
+    const dist = positionBuffer.toAttribute().length();
+    const shellT = dist.div(params.orbRadius).sub(0.95).div(0.15).clamp(0.0, 1.0);
+    const speedT = speed.div(params.maxSpeed).clamp(0.0, 1.0);
+    const core = color('#6ec8ff');
+    const edge = color('#ffb35a');
+    const hot = color('#ff6b4a');
+    const base = mix(core, edge, shellT);
+    return vec4(mix(base, hot, speedT.mul(0.6)), 1.0);
   })();
 
-  // Circular sprite mask, avoiding visible square planes.
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
 
   const geometry = new THREE.PlaneGeometry(1, 1);
