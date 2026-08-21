@@ -4,6 +4,7 @@ import {
   If,
   abs,
   color,
+  cos,
   float,
   hash,
   instanceIndex,
@@ -72,7 +73,7 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     If(params.layer1Enabled.greaterThan(0.5), () => {
       // Diagonal TL→BR (canal azul): separa influencia TR vs BL
       // valor > 0 → lado superior-derecha; < 0 → inferior-izquierda
-      const sample = mix(home, p, 0.35);
+      const sample = mix(home, p, float(0.35));
       const diag = sample.x.mul(0.65).sub(sample.z.sub(4.5).mul(0.55));
       const wTR = smoothstep(-0.35, 1.1, diag);
       const wBL = smoothstep(-0.35, 1.1, diag.mul(-1.0));
@@ -88,8 +89,9 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
       const dirBL = toBL.div(dBL);
 
       // Flujo direccional (flechas azules): TR ← arriba-derecha; BL ← abajo-izquierda
-      const flowTR = vec3(0.75, 0.15, -0.55).normalize();
-      const flowBL = vec3(-0.75, 0.1, 0.6).normalize();
+      // Vectores ya normalizados (evita normalize() sobre literales en TSL)
+      const flowTR = vec3(0.80, 0.16, -0.58);
+      const flowBL = vec3(-0.78, 0.10, 0.62);
 
       // Atracción + flujo (más fuerte lejos del núcleo, para arrastrar la zona)
       const pullTR = dirTR.mul(params.layer1Attract).div(dTR.add(0.5))
