@@ -163,7 +163,7 @@ async function main() {
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; },
     onGlitchChange: () => perfGlitch.sync(),
-    onAmbientChange: () => ambient.syncIntensity()
+    onAmbientChange: () => ambient.sync()
   });
 
   const hud = document.createElement('div');

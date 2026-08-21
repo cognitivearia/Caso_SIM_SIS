@@ -27,9 +27,11 @@ export function createParameters() {
     bloomRadius: uniform(0.35),
     bloomThreshold: uniform(0.45),
 
-    // Ambiente · intensidad de los dos soles lejanos
+    // Ambiente · dos soles lejanos (solo luz; colores editables)
     ambientIntensity: uniform(0.75),
     ambientMix: uniform(0.1),
+    sunBackColor: uniform(new THREE.Color('#a78bfa')),
+    sunFrontColor: uniform(new THREE.Color('#60a5fa')),
 
     // Glitch (0 = limpio · 1 = fuerte)
     glitchAmount: uniform(0.35),

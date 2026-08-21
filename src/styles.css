@@ -29,7 +29,18 @@ canvas { display: block; width: 100%; height: 100%; }
 .panel p, .panel li { font-size: 12px; line-height: 1.4; color: #c9cdd2; }
 .panel .row { margin: 8px 0; }
 .panel label { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
-.panel input[type="range"] { width: 100%; }
+.panel input[type="color"] {
+  width: 100%;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.panel .color-row label {
+  margin-bottom: 4px;
+}
 .panel input[type="checkbox"] { transform: translateY(1px); }
 .panel button, .panel select {
   width: 100%;

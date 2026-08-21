@@ -35,6 +35,35 @@ function rangeRow(parent, label, object, key, min, max, step, onInput, getValue)
   };
 }
 
+function colorRow(parent, label, getHex, onInput) {
+  const wrap = document.createElement('div');
+  wrap.className = 'row color-row';
+  const lab = document.createElement('label');
+  const name = document.createElement('span');
+  name.textContent = label;
+  const value = document.createElement('span');
+  value.className = 'value';
+  lab.append(name, value);
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.value = getHex();
+  value.textContent = input.value;
+  const refresh = () => {
+    value.textContent = input.value;
+    onInput?.(input.value);
+  };
+  input.addEventListener('input', refresh);
+  wrap.append(lab, input);
+  parent.append(wrap);
+  return {
+    input,
+    refresh() {
+      input.value = getHex();
+      value.textContent = input.value;
+    }
+  };
+}
+
 function button(parent, label, onClick) {
   const b = document.createElement('button');
   b.textContent = label;
@@ -128,6 +157,24 @@ export function createLabPanel({
     onAmbientChange?.();
   }, () => params.ambientIntensity.value));
   refreshers.push(rangeRow(lookGroup, 'sun wash', state, 'ambientMix', 0, 0.4, 0.01, (v) => params.ambientMix.value = v, () => params.ambientMix.value));
+  refreshers.push(colorRow(
+    lookGroup,
+    'sun back',
+    () => `#${params.sunBackColor.value.getHexString()}`,
+    (hex) => {
+      params.sunBackColor.value.set(hex);
+      onAmbientChange?.();
+    }
+  ));
+  refreshers.push(colorRow(
+    lookGroup,
+    'sun front',
+    () => `#${params.sunFrontColor.value.getHexString()}`,
+    (hex) => {
+      params.sunFrontColor.value.set(hex);
+      onAmbientChange?.();
+    }
+  ));
   refreshers.push(rangeRow(lookGroup, 'glitch', state, 'glitchAmount', 0, 1, 0.01, (v) => {
     params.glitchAmount.value = v;
     onGlitchChange?.();
