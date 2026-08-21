@@ -57,7 +57,7 @@ export function createLabPanel({
   panel.className = 'panel';
   panel.innerHTML = `
     <h1>Horizon · Layer Forces</h1>
-    <p>Base: plano olas/dunas. Capas on/off. <strong>2</strong> forma redes neuronales.</p>
+    <p>Base: plano olas/dunas. Capas on/off; al combinarlas se deforman entre sí (cross-talk).</p>
   `;
 
   const sim = document.createElement('div');
@@ -92,7 +92,8 @@ export function createLabPanel({
     layer4Turns: params.layer4Turns.value,
     layer4Spin: params.layer4Spin.value,
     layer4Streak: params.layer4Streak.value,
-    layer4PathSpeed: params.layer4PathSpeed.value
+    layer4PathSpeed: params.layer4PathSpeed.value,
+    layerCrossTalk: params.layerCrossTalk.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -105,6 +106,8 @@ export function createLabPanel({
   layersGroup.className = 'group';
   layersGroup.innerHTML = '<h2>Capas (presets)</h2>';
   panel.append(layersGroup);
+
+  refreshers.push(rangeRow(layersGroup, 'cross-talk', state, 'layerCrossTalk', 0, 1.2, 0.05, (v) => params.layerCrossTalk.value = v, () => params.layerCrossTalk.value));
 
   const layerStatus = document.createElement('p');
   layerStatus.style.margin = '6px 0 0';

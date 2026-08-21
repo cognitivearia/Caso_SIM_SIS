@@ -16,6 +16,8 @@ export function createParameters() {
     waveFreqZ: uniform(0.85),
     waveSpeed: uniform(1.35),
     dragCoefficient: uniform(0.22),
+    // Qué tanto se deforman unas capas con otras (0 = solo coexisten, 1 = cruce fuerte)
+    layerCrossTalk: uniform(0.65),
 
     // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),

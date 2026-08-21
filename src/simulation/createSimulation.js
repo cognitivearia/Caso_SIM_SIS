@@ -12,6 +12,7 @@ import {
   instanceIndex,
   instancedArray,
   max,
+  min,
   mix,
   mod,
   sin,
@@ -419,28 +420,91 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const jitter = vec3(m1.sub(0.5), m2.sub(0.5).mul(0.7), m3.sub(0.5).mul(0.5)).mul(0.06);
     const maelstromTarget = pathCenter.add(orb).add(tail).add(streak.mul(m4.sub(0.5).mul(2.0))).add(jitter);
 
-    // Blend de capas (base → neuronas → sierra → torbellino)
-    target.assign(mix(baseTarget, neuralTarget, params.layer2Enabled));
-    target.assign(mix(target, sawLinesTarget, params.layer3Enabled));
-    target.assign(mix(target, maelstromTarget, params.layer4Enabled));
+    // --- Cruce entre capas ---
+    // 1) Cada estructura se deforma con las otras activas (no se pisan).
+    // 2) Las partículas se reparten entre capas encendidas (siguen siendo legibles).
+    const xt = params.layerCrossTalk;
+    const e1 = params.layer1Enabled;
+    const e2 = params.layer2Enabled;
+    const e3 = params.layer3Enabled;
+    const e4 = params.layer4Enabled;
 
-    springK.assign(
-      mix(
-        params.planeSpring.mul(float(1.0).sub(influence1)),
-        params.layer2Spring,
-        params.layer2Enabled
-      )
+    const vToTR = params.vortexTR.sub(p);
+    const vToBL = params.vortexBL.sub(p);
+    const vDTR = max(vToTR.length(), float(0.6));
+    const vDBL = max(vToBL.length(), float(0.6));
+    const vortexTwist = vec3(0.0, 1.0, 0.0).cross(vToTR.div(vDTR)).mul(e1.mul(xt).mul(0.55).div(vDTR.add(0.4)))
+      .add(vec3(0.0, 1.0, 0.0).cross(vToBL.div(vDBL)).mul(e1.mul(xt).mul(-0.6).div(vDBL.add(0.4))));
+
+    const sawRipple = vec3(
+      0.0,
+      sawY.mul(e3.mul(xt).mul(0.55)),
+      sin(hx.mul(params.layer3Frequency).add(params.time.mul(params.layer3Speed))).mul(e3.mul(xt).mul(0.2))
     );
-    springK.assign(mix(springK, params.layer3Spring, params.layer3Enabled));
-    springK.assign(mix(springK, params.layer4Spring, params.layer4Enabled));
 
-    force.addAssign(wobble.mul(params.layer2Enabled).mul(0.04));
-    force.addAssign(wobble.mul(params.layer3Enabled).mul(0.03));
-    force.addAssign(wobble.mul(params.layer4Enabled).mul(0.05));
+    const neuralPull = hub.sub(p).mul(e2.mul(xt).mul(0.12));
+    const neuralLift = vec3(0.0, e2.mul(xt).mul(0.18).mul(smoothstep(float(0.8), float(2.4), hub.y)), 0.0);
+
+    const toPath = pathCenter.sub(p);
+    const pathDist = max(toPath.length(), float(0.35));
+    const maelPull = toPath.mul(e4.mul(xt).mul(0.14).div(pathDist.add(0.5)));
+    const maelTwist = pathTangent.cross(toPath).mul(e4.mul(xt).mul(0.08).div(pathDist.add(0.35)));
+
+    // Cada capa recibe influencia de las demás (no de sí misma)
+    const neuralX = neuralTarget
+      .add(vortexTwist.mul(1.1))
+      .add(sawRipple)
+      .add(maelPull)
+      .add(maelTwist.mul(0.65));
+
+    const sawX = sawLinesTarget
+      .add(vortexTwist)
+      .add(neuralPull)
+      .add(neuralLift)
+      .add(maelPull.mul(1.15))
+      .add(maelTwist);
+
+    const maelX = maelstromTarget
+      .add(vortexTwist.mul(0.85))
+      .add(neuralPull.mul(0.7))
+      .add(sawRipple.mul(0.8))
+      .add(vec3(
+        sin(params.time.mul(1.1).add(hub.x)).mul(e2.mul(xt).mul(0.12)),
+        cos(params.time.mul(0.9).add(hub.z)).mul(e2.mul(xt).mul(0.1)),
+        0.0
+      ));
+
+    // Reparto de partículas entre capas estructurales activas
+    const structSum = e2.add(e3).add(e4);
+    const role = hash(i.add(uint(701)));
+    const edge2 = e2.div(max(structSum, 0.001));
+    const edge3 = e2.add(e3).div(max(structSum, 0.001));
+    const belong2 = e2.mul(float(1.0).sub(step(edge2, role)));
+    const belong3 = e3.mul(step(edge2, role)).mul(float(1.0).sub(step(edge3, role)));
+    const belong4 = e4.mul(step(edge3, role));
+    // Si no hay capa estructural, belong* = 0 → queda el plano base
+
+    const structTarget = neuralX.mul(belong2).add(sawX.mul(belong3)).add(maelX.mul(belong4));
+    const structOn = min(structSum, float(1.0));
+    target.assign(mix(baseTarget, structTarget, structOn.mul(0.94)));
+
+    // Resortes: promedio ponderado de las capas a las que pertenece la partícula
+    const springStruct = params.layer2Spring.mul(belong2)
+      .add(params.layer3Spring.mul(belong3))
+      .add(params.layer4Spring.mul(belong4));
+    const springBase = params.planeSpring.mul(float(1.0).sub(influence1));
+    springK.assign(mix(springBase, springStruct, structOn));
+
+    // Fuerzas cruzadas suaves (todas las capas empujan un poco, no solo la “dueña”)
+    force.addAssign(neuralTarget.sub(p).mul(e2.mul(xt).mul(0.9)).mul(float(1.0).sub(belong2)));
+    force.addAssign(sawLinesTarget.sub(p).mul(e3.mul(xt).mul(0.75)).mul(float(1.0).sub(belong3)));
+    force.addAssign(maelstromTarget.sub(p).mul(e4.mul(xt).mul(0.85)).mul(float(1.0).sub(belong4)));
+
+    force.addAssign(wobble.mul(e2.mul(0.035).add(e3.mul(0.03)).add(e4.mul(0.045))));
 
     force.addAssign(target.sub(p).mul(springK));
-    const layerDrag = max(params.layer2Enabled, max(params.layer3Enabled, params.layer4Enabled));
-    const drag = params.dragCoefficient.mul(mix(1.0, 2.8, layerDrag));
+    const layerDrag = max(e2, max(e3, e4));
+    const drag = params.dragCoefficient.mul(mix(1.0, 2.6, layerDrag));
     force.addAssign(v.mul(drag).mul(-1.0));
 
     v.addAssign(force.mul(dt));
@@ -466,11 +530,13 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
     const neuralScale = mix(0.45, 1.55, hubGlow);
     const sawScale = mix(1.35, 0.5, params.layer3Density);
-    // Torbellino: más grueso en loops, más fino hacia la salida
     const maelScale = mix(1.05, 0.55, pos.x.mul(0.08).add(0.5).clamp(0.0, 1.0));
-    const layered = mix(1.0, neuralScale, params.layer2Enabled);
-    const afterSaw = mix(layered, sawScale, params.layer3Enabled);
-    return params.particleSize.mul(mix(afterSaw, maelScale, params.layer4Enabled));
+    const e2s = params.layer2Enabled;
+    const e3s = params.layer3Enabled;
+    const e4s = params.layer4Enabled;
+    const sSum = max(e2s.add(e3s).add(e4s), 0.001);
+    const structScale = neuralScale.mul(e2s).add(sawScale.mul(e3s)).add(maelScale.mul(e4s)).div(sSum);
+    return params.particleSize.mul(mix(float(1.0), structScale, min(e2s.add(e3s).add(e4s), float(1.0))));
   })();
 
   material.colorNode = Fn(() => {
@@ -505,10 +571,13 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const inkBlack = color('#0a0a0a');
     const maelCol = mix(inkWhite, mix(inkGrey, inkBlack, funnelT), funnelT.mul(0.75));
 
-    const afterNeural = mix(planeCol, neuralCol, params.layer2Enabled);
-    const afterSaw = mix(afterNeural, sawCol, params.layer3Enabled);
-    const base = mix(afterSaw, maelCol, params.layer4Enabled);
-    return vec4(mix(base, hot, speedT.mul(0.15).mul(float(1.0).sub(params.layer4Enabled))), 1.0);
+    const e2c = params.layer2Enabled;
+    const e3c = params.layer3Enabled;
+    const e4c = params.layer4Enabled;
+    const cSum = max(e2c.add(e3c).add(e4c), 0.001);
+    const structCol = neuralCol.mul(e2c).add(sawCol.mul(e3c)).add(maelCol.mul(e4c)).div(cSum);
+    const base = mix(planeCol, structCol, min(e2c.add(e3c).add(e4c), float(1.0)));
+    return vec4(mix(base, hot, speedT.mul(0.12)), 1.0);
   })();
 
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
