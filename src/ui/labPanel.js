@@ -77,7 +77,8 @@ export function createLabPanel({
     layer1Chaos: params.layer1Chaos.value,
     layer2Spring: params.layer2Spring.value,
     layer2BranchLen: params.layer2BranchLen.value,
-    layer2Pulse: params.layer2Pulse.value
+    layer2Pulse: params.layer2Pulse.value,
+    layer2Organic: params.layer2Organic.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -123,8 +124,9 @@ export function createLabPanel({
 
   button(layersGroup, '2 · Redes neuronales', () => onToggleLayer('neuralNet'));
   refreshers.push(rangeRow(layersGroup, 'neural spring', state, 'layer2Spring', 2, 18, 0.1, (v) => params.layer2Spring.value = v, () => params.layer2Spring.value));
-  refreshers.push(rangeRow(layersGroup, 'branch length', state, 'layer2BranchLen', 1, 5, 0.05, (v) => params.layer2BranchLen.value = v, () => params.layer2BranchLen.value));
+  refreshers.push(rangeRow(layersGroup, 'branch length', state, 'layer2BranchLen', 1, 6, 0.05, (v) => params.layer2BranchLen.value = v, () => params.layer2BranchLen.value));
   refreshers.push(rangeRow(layersGroup, 'soma pulse', state, 'layer2Pulse', 0, 0.4, 0.01, (v) => params.layer2Pulse.value = v, () => params.layer2Pulse.value));
+  refreshers.push(rangeRow(layersGroup, 'organic', state, 'layer2Organic', 0, 2.5, 0.05, (v) => params.layer2Organic.value = v, () => params.layer2Organic.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';

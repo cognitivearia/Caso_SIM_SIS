@@ -29,8 +29,9 @@ export function createParameters() {
 
     // Capa 2 · redes neuronales
     layer2Enabled: uniform(0.0),
-    layer2Spring: uniform(9.5),
-    layer2Pulse: uniform(0.12),
-    layer2BranchLen: uniform(2.6)
+    layer2Spring: uniform(7.2),
+    layer2Pulse: uniform(0.08),
+    layer2BranchLen: uniform(3.4),
+    layer2Organic: uniform(1.15)
   };
 }
