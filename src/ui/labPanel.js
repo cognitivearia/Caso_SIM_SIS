@@ -79,7 +79,13 @@ export function createLabPanel({
     layer2BranchLen: params.layer2BranchLen.value,
     layer2Pulse: params.layer2Pulse.value,
     layer2Organic: params.layer2Organic.value,
-    layer2Thickness: params.layer2Thickness.value
+    layer2Thickness: params.layer2Thickness.value,
+    layer3Spring: params.layer3Spring.value,
+    layer3LineCount: params.layer3LineCount.value,
+    layer3Amplitude: params.layer3Amplitude.value,
+    layer3Frequency: params.layer3Frequency.value,
+    layer3Speed: params.layer3Speed.value,
+    layer3Thickness: params.layer3Thickness.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -98,7 +104,8 @@ export function createLabPanel({
   const refreshLayerStatus = () => {
     const l1 = layers.cornerVortices.on ? 'ON' : 'off';
     const l2 = layers.neuralNet.on ? 'ON' : 'off';
-    layerStatus.textContent = `1 vórtices: ${l1} · 2 neuronas: ${l2}`;
+    const l3 = layers.sawLines.on ? 'ON' : 'off';
+    layerStatus.textContent = `1 vórtices: ${l1} · 2 neuronas: ${l2} · 3 sierra: ${l3}`;
   };
   refreshLayerStatus();
   layersGroup.append(layerStatus);

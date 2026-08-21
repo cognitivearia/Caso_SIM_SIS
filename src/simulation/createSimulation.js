@@ -7,6 +7,7 @@ import {
   cos,
   float,
   floor,
+  fract,
   hash,
   instanceIndex,
   instancedArray,
@@ -247,7 +248,34 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const filament = mix(primaryPos, mix(fork1Pos, fork2Pos, onFork2), onFork1);
     const neuralTarget = mix(mix(filament, somaPos, onSoma), bridgePos, onBridge);
 
+    // --- CAPA 3: líneas paralelas + onda de sierra armónica ---
+    const s1 = hash(i.add(uint(307)));
+    const s2 = hash(i.add(uint(353)));
+    const s3 = hash(i.add(uint(401)));
+    const lineCount = max(params.layer3LineCount, 2.0);
+    const lineId = floor(s1.mul(lineCount));
+    // Posición a lo largo de la línea (eje X)
+    const along = s2.sub(0.5).mul(11.5);
+    // Separación paralela en Z
+    const lineZ = lineId.add(0.5).div(lineCount).mul(12.5).sub(1.8);
+    // Grosor fino de cada línea
+    const lineThick = s3.sub(0.5).mul(params.layer3Thickness);
+
+    // Armónicos: línea n vibra a frecuencia (n+1) · f0, desfasada
+    const harmonic = lineId.add(1.0);
+    const sawPhase = along.mul(params.layer3Frequency).mul(harmonic.mul(0.12).add(0.55))
+      .add(params.time.mul(params.layer3Speed).mul(harmonic.mul(0.35).add(0.65)))
+      .add(lineId.mul(0.37));
+    // Onda de sierra: rampa 0→1 y cae (fract)
+    const saw = fract(sawPhase);
+    const sawY = saw.mul(params.layer3Amplitude).mul(mix(0.75, 1.2, s3));
+
+    const sawLinesTarget = vec3(along, sawY.add(0.15), lineZ.add(lineThick));
+
+    // Blend de capas (base → neuronas → sierra)
     target.assign(mix(baseTarget, neuralTarget, params.layer2Enabled));
+    target.assign(mix(target, sawLinesTarget, params.layer3Enabled));
+
     springK.assign(
       mix(
         params.planeSpring.mul(float(1.0).sub(influence1)),
@@ -255,13 +283,14 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
         params.layer2Enabled
       )
     );
+    springK.assign(mix(springK, params.layer3Spring, params.layer3Enabled));
 
-    // Casi sin caos en neuronas (si no, se vuelve nube)
     force.addAssign(wobble.mul(params.layer2Enabled).mul(0.04));
+    force.addAssign(wobble.mul(params.layer3Enabled).mul(0.03));
 
     force.addAssign(target.sub(p).mul(springK));
-    // Más drag en neuronas → se pegan al filamento y no se difuminan
-    const drag = params.dragCoefficient.mul(mix(1.0, 2.8, params.layer2Enabled));
+    const layerDrag = max(params.layer2Enabled, params.layer3Enabled);
+    const drag = params.dragCoefficient.mul(mix(1.0, 2.8, layerDrag));
     force.addAssign(v.mul(drag).mul(-1.0));
 
     v.addAssign(force.mul(dt));
@@ -285,9 +314,10 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
   material.scaleNode = Fn(() => {
     const pos = positionBuffer.toAttribute();
     const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
-    // Filamentos muy finos; somas un poco más grandes
     const neuralScale = mix(0.45, 1.55, hubGlow);
-    return params.particleSize.mul(mix(1.0, neuralScale, params.layer2Enabled));
+    const sawScale = float(0.7);
+    const layered = mix(1.0, neuralScale, params.layer2Enabled);
+    return params.particleSize.mul(mix(layered, sawScale, params.layer3Enabled));
   })();
 
   material.colorNode = Fn(() => {
@@ -311,7 +341,12 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const nearHub = smoothstep(float(1.15), float(2.85), pos.y);
     const neuralCol = mix(neuralBase, mix(node, glow, 0.55), nearHub.mul(0.95));
 
-    const base = mix(planeCol, neuralCol, params.layer2Enabled);
+    const sawCold = color('#7eb8ff');
+    const sawWarm = color('#e8f0ff');
+    const sawCol = mix(sawCold, sawWarm, heightT);
+
+    const afterNeural = mix(planeCol, neuralCol, params.layer2Enabled);
+    const base = mix(afterNeural, sawCol, params.layer3Enabled);
     return vec4(mix(base, hot, speedT.mul(0.2)), 1.0);
   })();
 

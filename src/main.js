@@ -73,7 +73,8 @@ async function main() {
 
   const layers = {
     cornerVortices: { on: false },
-    neuralNet: { on: false }
+    neuralNet: { on: false },
+    sawLines: { on: false }
   };
 
   const perfChaos = createPerfChaosSlider(params);
@@ -81,10 +82,11 @@ async function main() {
   const updateHud = () => {
     const l1 = layers.cornerVortices.on ? 'ON' : 'off';
     const l2 = layers.neuralNet.on ? 'ON' : 'off';
+    const l3 = layers.sawLines.on ? 'ON' : 'off';
     if (mode === 'LAB') {
-      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: vórtices [${l1}] · 2: neuronas [${l2}]`;
+      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: vórtices [${l1}] · 2: neuronas [${l2}] · 3: sierra [${l3}]`;
     } else {
-      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: vórtices [${l1}] · 2: neuronas [${l2}]`;
+      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1 [${l1}] · 2 [${l2}] · 3 [${l3}]`;
     }
   };
 
@@ -102,8 +104,16 @@ async function main() {
     updateHud();
   };
 
+  const setLayer3 = (on) => {
+    layers.sawLines.on = on;
+    params.layer3Enabled.value = on ? 1 : 0;
+    panel?.refresh();
+    updateHud();
+  };
+
   const toggleLayer1 = () => setLayer1(!layers.cornerVortices.on);
   const toggleLayer2 = () => setLayer2(!layers.neuralNet.on);
+  const toggleLayer3 = () => setLayer3(!layers.sawLines.on);
 
   const setMode = (next) => {
     mode = next;
@@ -117,6 +127,7 @@ async function main() {
   const hardReset = () => {
     setLayer1(false);
     setLayer2(false);
+    setLayer3(false);
     elapsed = 0;
     params.time.value = 0;
     simulation.reset();
@@ -130,6 +141,7 @@ async function main() {
     onToggleLayer: (id) => {
       if (id === 'cornerVortices') toggleLayer1();
       if (id === 'neuralNet') toggleLayer2();
+      if (id === 'sawLines') toggleLayer3();
     },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; },
@@ -147,6 +159,7 @@ async function main() {
     if (event.code === 'KeyR') hardReset();
     if (event.code === 'Digit1') toggleLayer1();
     if (event.code === 'Digit2') toggleLayer2();
+    if (event.code === 'Digit3') toggleLayer3();
   });
 
   addEventListener('resize', () => {

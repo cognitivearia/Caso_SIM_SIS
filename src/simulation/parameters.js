@@ -33,6 +33,15 @@ export function createParameters() {
     layer2Pulse: uniform(0.05),
     layer2BranchLen: uniform(3.8),
     layer2Organic: uniform(0.55),
-    layer2Thickness: uniform(0.09)
+    layer2Thickness: uniform(0.09),
+
+    // Capa 3 · líneas paralelas con onda de sierra armónica
+    layer3Enabled: uniform(0.0),
+    layer3Spring: uniform(14.0),
+    layer3LineCount: uniform(22.0),
+    layer3Amplitude: uniform(0.55),
+    layer3Frequency: uniform(0.55),
+    layer3Speed: uniform(0.85),
+    layer3Thickness: uniform(0.035)
   };
 }
