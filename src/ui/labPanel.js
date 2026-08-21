@@ -35,25 +35,6 @@ function rangeRow(parent, label, object, key, min, max, step, onInput, getValue)
   };
 }
 
-function checkRow(parent, label, initial, onChange, getValue) {
-  const wrap = document.createElement('div');
-  wrap.className = 'row';
-  const lab = document.createElement('label');
-  const name = document.createElement('span');
-  name.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = initial;
-  input.addEventListener('change', () => onChange(input.checked));
-  lab.append(name, input);
-  wrap.append(lab);
-  parent.append(wrap);
-  return {
-    input,
-    refresh() { if (getValue) input.checked = Boolean(getValue()); }
-  };
-}
-
 function button(parent, label, onClick) {
   const b = document.createElement('button');
   b.textContent = label;
@@ -62,69 +43,69 @@ function button(parent, label, onClick) {
   return b;
 }
 
-export function createLabPanel({ params, onReset, onPreset, onModeChange, onPauseChange }) {
+export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeChange, onPauseChange }) {
   const refreshers = [];
   const panel = document.createElement('aside');
   panel.className = 'panel';
   panel.innerHTML = `
-    <h1>U3 · Forces Instrument</h1>
-    <p>LAB: aísla fuerzas, predice y prueba. <strong>P</strong> cambia a PERFORMANCE.</p>
+    <h1>Horizon · Layer Forces</h1>
+    <p>Base: plano hacia el horizonte (olas/dunas). Los presets son <strong>capas</strong> on/off sobre esa base. Sin mouse.</p>
   `;
 
   const sim = document.createElement('div');
   sim.className = 'group';
-  sim.innerHTML = '<h2>Simulación</h2>';
+  sim.innerHTML = '<h2>Base · plano</h2>';
   panel.append(sim);
 
   const state = {
     timeScale: params.timeScale.value,
-    maxSpeed: params.maxSpeed.value,
     particleSize: params.particleSize.value,
-    radialStrength: params.radialStrength.value,
-    vortexStrength: params.vortexStrength.value,
-    dragCoefficient: params.dragCoefficient.value,
-    windX: params.wind.value.x,
-    windY: params.wind.value.y
+    waveAmp: params.waveAmp.value,
+    waveSpeed: params.waveSpeed.value,
+    planeSpring: params.planeSpring.value,
+    layer1Attract: params.layer1Attract.value,
+    layer1OrbRadius: params.layer1OrbRadius.value,
+    layer1PulseAmp: params.layer1PulseAmp.value,
+    layer1PulseSpeed: params.layer1PulseSpeed.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
-  refreshers.push(rangeRow(sim, 'maxSpeed', state, 'maxSpeed', 0.2, 12, 0.1, (v) => params.maxSpeed.value = v, () => params.maxSpeed.value));
-  refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.005, 0.1, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
+  refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.005, 0.08, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
+  refreshers.push(rangeRow(sim, 'waveAmp', state, 'waveAmp', 0, 0.8, 0.01, (v) => params.waveAmp.value = v, () => params.waveAmp.value));
+  refreshers.push(rangeRow(sim, 'waveSpeed', state, 'waveSpeed', 0, 3, 0.05, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
+  refreshers.push(rangeRow(sim, 'planeSpring', state, 'planeSpring', 1, 16, 0.1, (v) => params.planeSpring.value = v, () => params.planeSpring.value));
 
-  const force = document.createElement('div');
-  force.className = 'group';
-  force.innerHTML = '<h2>Fuerzas</h2>';
-  panel.append(force);
+  const layersGroup = document.createElement('div');
+  layersGroup.className = 'group';
+  layersGroup.innerHTML = '<h2>Capas (presets)</h2><p>1 activa/desactiva sobre el mismo plano. Formación → pulso automático.</p>';
+  panel.append(layersGroup);
 
-  refreshers.push(checkRow(force, 'Radial', params.radialEnabled.value > 0, (v) => params.radialEnabled.value = v ? 1 : 0, () => params.radialEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'radialStrength', state, 'radialStrength', -8, 8, 0.05, (v) => params.radialStrength.value = v, () => params.radialStrength.value));
-  refreshers.push(checkRow(force, 'Vórtice', params.vortexEnabled.value > 0, (v) => params.vortexEnabled.value = v ? 1 : 0, () => params.vortexEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'vortexStrength', state, 'vortexStrength', -8, 8, 0.05, (v) => params.vortexStrength.value = v, () => params.vortexStrength.value));
-  refreshers.push(checkRow(force, 'Drag', params.dragEnabled.value > 0, (v) => params.dragEnabled.value = v ? 1 : 0, () => params.dragEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'dragCoefficient', state, 'dragCoefficient', 0, 1, 0.01, (v) => params.dragCoefficient.value = v, () => params.dragCoefficient.value));
-  refreshers.push(checkRow(force, 'Viento', params.windEnabled.value > 0, (v) => params.windEnabled.value = v ? 1 : 0, () => params.windEnabled.value > 0));
-  refreshers.push(rangeRow(force, 'wind.x', state, 'windX', -4, 4, 0.05, (v) => params.wind.value.x = v, () => params.wind.value.x));
-  refreshers.push(rangeRow(force, 'wind.y', state, 'windY', -4, 4, 0.05, (v) => params.wind.value.y = v, () => params.wind.value.y));
+  const layerStatus = document.createElement('p');
+  layerStatus.style.margin = '6px 0 0';
+  const refreshLayerStatus = () => {
+    const on = layers.orbSides.on;
+    const phase = layers.orbSides.phase;
+    layerStatus.textContent = on
+      ? `Capa 1: ON · fase ${phase === 'form' ? 'formación' : 'pulso lento'}`
+      : 'Capa 1: OFF';
+  };
+  refreshLayerStatus();
+  layersGroup.append(layerStatus);
+  refreshers.push({ refresh: refreshLayerStatus });
 
-  const tests = document.createElement('div');
-  tests.className = 'group';
-  tests.innerHTML = '<h2>Pruebas de comportamiento</h2><p>Antes de pulsar una prueba, predice qué debería ocurrir.</p>';
-  panel.append(tests);
-  for (const [id, label] of [
-    ['inertia', '1 · Inercia'],
-    ['wind', '2 · Fuerza constante +X'],
-    ['attract', '3 · Atracción'],
-    ['repel', '4 · Repulsión'],
-    ['vortex', '5 · Vórtice']
-  ]) button(tests, label, () => onPreset(id));
+  button(layersGroup, '1 · Orbes laterales (toggle)', () => onToggleLayer('orbSides'));
+  refreshers.push(rangeRow(layersGroup, 'attract', state, 'layer1Attract', 1, 16, 0.1, (v) => params.layer1Attract.value = v, () => params.layer1Attract.value));
+  refreshers.push(rangeRow(layersGroup, 'orbRadius', state, 'layer1OrbRadius', 0.2, 1.4, 0.05, (v) => params.layer1OrbRadius.value = v, () => params.layer1OrbRadius.value));
+  refreshers.push(rangeRow(layersGroup, 'pulseAmp', state, 'layer1PulseAmp', 0, 0.6, 0.01, (v) => params.layer1PulseAmp.value = v, () => params.layer1PulseAmp.value));
+  refreshers.push(rangeRow(layersGroup, 'pulseSpeed', state, 'layer1PulseSpeed', 0.2, 4, 0.05, (v) => params.layer1PulseSpeed.value = v, () => params.layer1PulseSpeed.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
-  button(actions, 'Reset', onReset);
+  button(actions, 'Reset plano (R)', onReset);
   button(actions, 'Pausar / continuar', () => onPauseChange());
-  button(actions, 'LAB / PERFORMANCE', () => onModeChange());
+  button(actions, 'LAB / PERFORMANCE (P)', () => onModeChange());
 
   document.body.append(panel);
 
