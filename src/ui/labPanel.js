@@ -49,7 +49,7 @@ export function createLabPanel({ params, onReset, onPulseActor, onModeChange, on
   panel.className = 'panel';
   panel.innerHTML = `
     <h1>Orb · Force Actors</h1>
-    <p>Orbe central. <strong>1</strong> y <strong>2</strong> disparan pulsaciones (no toggle).</p>
+    <p>Orbe central. <strong>1</strong> y <strong>2</strong> disparan un pulso único; al terminar vuelve a la esfera.</p>
   `;
 
   const sim = document.createElement('div');
@@ -90,13 +90,13 @@ export function createLabPanel({ params, onReset, onPulseActor, onModeChange, on
 
   actors.insertAdjacentHTML('beforeend', '<h2 style="margin-top:12px">1 · Maza</h2>');
   button(actors, 'Disparar maza (1)', () => onPulseActor('mace'));
-  refreshers.push(rangeRow(actors, 'maceStrength', actorState, 'maceStrength', 0, 50, 0.5, (v) => params.maceStrength.value = v, () => params.maceStrength.value));
+  refreshers.push(rangeRow(actors, 'maceStrength', actorState, 'maceStrength', 0, 2, 0.05, (v) => params.maceStrength.value = v, () => params.maceStrength.value));
   refreshers.push(rangeRow(actors, 'maceSpikeCount', actorState, 'maceSpikeCount', 4, 20, 1, (v) => params.maceSpikeCount.value = v, () => params.maceSpikeCount.value));
   refreshers.push(rangeRow(actors, 'maceSharpness', actorState, 'maceSharpness', 2, 20, 0.5, (v) => params.maceSharpness.value = v, () => params.maceSharpness.value));
 
   actors.insertAdjacentHTML('beforeend', '<h2 style="margin-top:12px">2 · Ondas X</h2>');
   button(actors, 'Disparar ondas (2)', () => onPulseActor('wave'));
-  refreshers.push(rangeRow(actors, 'waveStrength', actorState, 'waveStrength', 0, 4, 0.05, (v) => params.waveStrength.value = v, () => params.waveStrength.value));
+  refreshers.push(rangeRow(actors, 'waveStrength', actorState, 'waveStrength', 0, 1.5, 0.05, (v) => params.waveStrength.value = v, () => params.waveStrength.value));
   refreshers.push(rangeRow(actors, 'waveFrequency', actorState, 'waveFrequency', 1, 10, 0.1, (v) => params.waveFrequency.value = v, () => params.waveFrequency.value));
   refreshers.push(rangeRow(actors, 'waveSpeed', actorState, 'waveSpeed', 0.5, 12, 0.1, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
   refreshers.push(rangeRow(actors, 'waveWidth', actorState, 'waveWidth', 0.15, 1.5, 0.05, (v) => params.waveWidth.value = v, () => params.waveWidth.value));

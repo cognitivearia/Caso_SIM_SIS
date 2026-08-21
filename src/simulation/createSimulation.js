@@ -61,43 +61,45 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const dist = max(p.length(), 0.001);
     const dir = p.div(dist);
 
-    // Resorte hacia la cáscara base del orbe
-    const shellError = dist.sub(params.orbRadius);
-    force.addAssign(dir.mul(shellError).mul(params.orbSpringStrength).mul(-1.0));
+    // Deformación temporal: modifica el radio objetivo.
+    // Cuando macePulse y wavePulse son 0, targetRadius = orbRadius → vuelve al orbe.
+    const offset = float(0.0).toVar();
 
-    // Actor 1 · Maza: picos triangulares afilados (menos redondeados)
-    // Patrón tipo sierra: crestas estrechas en el ángulo azimut
+    // Actor 1 · Maza: picos triangulares afilados
     const theta = atan(dir.y, dir.x);
     const spikePhase = fract(theta.div(6.28318530718).mul(params.maceSpikeCount).add(0.5));
-    const triangular = abs(spikePhase.sub(0.5)).mul(2.0); // 0 en cresta, 1 en valle
-    const spikePattern = pow(max(float(1.0).sub(triangular.mul(params.maceSharpness.mul(0.45))), 0.0), 1.8);
-
-    // Solo empuja la cáscara exterior hacia fuera en las crestas
-    const outerBias = max(dist.sub(params.orbRadius.mul(0.75)), 0.0).div(params.orbRadius.mul(0.4)).clamp(0.0, 1.0);
-    force.addAssign(
-      dir.mul(spikePattern).mul(params.maceStrength).mul(params.macePulse).mul(outerBias)
+    const triangular = abs(spikePhase.sub(0.5)).mul(2.0);
+    const spikePattern = pow(
+      max(float(1.0).sub(triangular.mul(params.maceSharpness.mul(0.45))), 0.0),
+      1.8
     );
+    offset.addAssign(spikePattern.mul(params.maceStrength).mul(params.macePulse));
 
-    // Actor 2 · Ondas: anillos de desplazamiento radial viajando por el eje X
-    // desde el centro hacia ±X (crestas perpendiculares al eje X)
+    // Actor 2 · Ondas: anillos viajando por X (mismo look visual)
     const ax = abs(p.x);
     const localT = max(params.time.sub(params.waveOriginTime), 0.0);
     const phase = params.waveFrequency.mul(ax).sub(localT.mul(params.waveSpeed));
     const ring = sin(phase);
-    // Ventana que sigue el frente de onda saliendo del centro
     const front = localT.mul(params.waveSpeed).div(params.waveFrequency.add(0.001));
     const frontDist = abs(ax.sub(front));
-    const frontMask = exp(frontDist.mul(frontDist).div(params.waveWidth.mul(params.waveWidth).add(0.001)).mul(-1.0));
+    const frontMask = exp(
+      frontDist.mul(frontDist).div(params.waveWidth.mul(params.waveWidth).add(0.001)).mul(-1.0)
+    );
     const radialYZ = sqrt(p.y.mul(p.y).add(p.z.mul(p.z)).add(0.001));
     const ringShape = radialYZ.div(params.orbRadius.add(0.001)).clamp(0.2, 1.0);
+    offset.addAssign(
+      ring.mul(params.waveStrength).mul(params.wavePulse).mul(frontMask).mul(ringShape)
+    );
 
-    const waveOffset = ring.mul(params.waveStrength).mul(params.wavePulse).mul(frontMask).mul(ringShape);
-    force.addAssign(dir.mul(waveOffset).mul(params.orbSpringStrength.mul(1.8)));
+    const targetRadius = params.orbRadius.add(offset);
+    const shellError = dist.sub(targetRadius);
+    const spring = params.orbSpringStrength.mul(params.recoveryBoost);
+    force.addAssign(dir.mul(shellError).mul(spring).mul(-1.0));
 
-    // Drag lineal
-    force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
+    // Drag fuerte (más fuerte en recuperación) para que no quede oscilando
+    const drag = params.dragCoefficient.mul(params.dragEnabled).mul(params.recoveryBoost);
+    force.addAssign(v.mul(drag).mul(-1.0));
 
-    // Integración
     v.addAssign(force.mul(dt));
 
     const speed = v.length();
