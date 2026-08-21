@@ -604,11 +604,11 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     // Destello de velocidad (ámbar compartido) + boost para que el bloom lo recoja
     const lit = mix(base, amber, speedT.mul(0.22));
 
-    // Lavado ambiental lejano: morado arriba · azul abajo (según altura de la partícula)
+    // Lavado ambiental suave desde los soles (morado alto / azul bajo)
     const ambT = smoothstep(float(-0.4), float(3.2), pos.y);
-    const ambPurple = color('#b794f6');
+    const ambPurple = color('#a78bfa');
     const ambBlue = color('#60a5fa');
-    const ambWash = mix(ambBlue, ambPurple, ambT).mul(params.ambientMix).mul(params.ambientIntensity);
+    const ambWash = mix(ambBlue, ambPurple, ambT).mul(params.ambientMix).mul(params.ambientIntensity.mul(0.65));
     const litAmb = lit.add(ambWash);
 
     // Glitch en partícula: saltos de canal y destellos irregulares

@@ -27,9 +27,9 @@ export function createParameters() {
     bloomRadius: uniform(0.35),
     bloomThreshold: uniform(0.45),
 
-    // Ambiente lejano · morado arriba / azul abajo
-    ambientIntensity: uniform(1.35),
-    ambientMix: uniform(0.22),
+    // Ambiente · intensidad de los dos soles lejanos
+    ambientIntensity: uniform(0.75),
+    ambientMix: uniform(0.1),
 
     // Glitch (0 = limpio · 1 = fuerte)
     glitchAmount: uniform(0.35),

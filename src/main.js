@@ -47,7 +47,7 @@ async function main() {
 
   const scene = new THREE.Scene();
 
-  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 80);
+  const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 220);
   camera.position.set(0, 5.2, 9.5);
 
   const renderer = new THREE.WebGPURenderer({ antialias: true });
