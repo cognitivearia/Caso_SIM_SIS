@@ -252,21 +252,28 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const s1 = hash(i.add(uint(307)));
     const s2 = hash(i.add(uint(353)));
     const s3 = hash(i.add(uint(401)));
-    const lineCount = max(params.layer3LineCount, 2.0);
+
+    // Densidad → cantidad de líneas (pocas↔muchas)
+    const density = params.layer3Density.clamp(0.0, 1.0);
+    const lineCount = max(mix(5.0, 38.0, density), 2.0);
     const lineId = floor(s1.mul(lineCount));
+
+    // Grosor inverso a la densidad: menos líneas = más gruesas
+    const thickScale = mix(2.4, 0.35, density);
+    const lineThick = s3.sub(0.5).mul(0.045).mul(thickScale);
+
     // Posición a lo largo de la línea (eje X)
     const along = s2.sub(0.5).mul(11.5);
-    // Separación paralela en Z
-    const lineZ = lineId.add(0.5).div(lineCount).mul(12.5).sub(1.8);
-    // Grosor fino de cada línea
-    const lineThick = s3.sub(0.5).mul(params.layer3Thickness);
+    // Span más corto → menor distancia entre líneas
+    const lineZ = lineId.add(0.5).div(lineCount).mul(params.layer3Span).add(
+      float(4.2).sub(params.layer3Span.mul(0.5))
+    );
 
     // Armónicos: línea n vibra a frecuencia (n+1) · f0, desfasada
     const harmonic = lineId.add(1.0);
     const sawPhase = along.mul(params.layer3Frequency).mul(harmonic.mul(0.12).add(0.55))
       .add(params.time.mul(params.layer3Speed).mul(harmonic.mul(0.35).add(0.65)))
       .add(lineId.mul(0.37));
-    // Onda de sierra: rampa 0→1 y cae (fract)
     const saw = fract(sawPhase);
     const sawY = saw.mul(params.layer3Amplitude).mul(mix(0.75, 1.2, s3));
 
@@ -315,7 +322,7 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const pos = positionBuffer.toAttribute();
     const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
     const neuralScale = mix(0.45, 1.55, hubGlow);
-    const sawScale = float(0.7);
+    const sawScale = mix(1.35, 0.5, params.layer3Density);
     const layered = mix(1.0, neuralScale, params.layer2Enabled);
     return params.particleSize.mul(mix(layered, sawScale, params.layer3Enabled));
   })();

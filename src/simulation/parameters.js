@@ -38,10 +38,12 @@ export function createParameters() {
     // Capa 3 · líneas paralelas con onda de sierra armónica
     layer3Enabled: uniform(0.0),
     layer3Spring: uniform(14.0),
-    layer3LineCount: uniform(22.0),
+    // 0 = pocas líneas gruesas · 1 = muchas líneas delgadas
+    layer3Density: uniform(0.45),
     layer3Amplitude: uniform(0.55),
     layer3Frequency: uniform(0.55),
     layer3Speed: uniform(0.85),
-    layer3Thickness: uniform(0.035)
+    // Separación total en Z (más bajo = líneas más juntas)
+    layer3Span: uniform(6.2)
   };
 }

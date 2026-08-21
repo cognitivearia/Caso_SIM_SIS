@@ -81,11 +81,11 @@ export function createLabPanel({
     layer2Organic: params.layer2Organic.value,
     layer2Thickness: params.layer2Thickness.value,
     layer3Spring: params.layer3Spring.value,
-    layer3LineCount: params.layer3LineCount.value,
+    layer3Density: params.layer3Density.value,
     layer3Amplitude: params.layer3Amplitude.value,
     layer3Frequency: params.layer3Frequency.value,
     layer3Speed: params.layer3Speed.value,
-    layer3Thickness: params.layer3Thickness.value
+    layer3Span: params.layer3Span.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -136,6 +136,14 @@ export function createLabPanel({
   refreshers.push(rangeRow(layersGroup, 'thickness', state, 'layer2Thickness', 0.02, 0.25, 0.005, (v) => params.layer2Thickness.value = v, () => params.layer2Thickness.value));
   refreshers.push(rangeRow(layersGroup, 'soma pulse', state, 'layer2Pulse', 0, 0.3, 0.01, (v) => params.layer2Pulse.value = v, () => params.layer2Pulse.value));
   refreshers.push(rangeRow(layersGroup, 'organic', state, 'layer2Organic', 0, 1.5, 0.05, (v) => params.layer2Organic.value = v, () => params.layer2Organic.value));
+
+  button(layersGroup, '3 · Líneas sierra armónicas', () => onToggleLayer('sawLines'));
+  refreshers.push(rangeRow(layersGroup, 'saw spring', state, 'layer3Spring', 4, 24, 0.1, (v) => params.layer3Spring.value = v, () => params.layer3Spring.value));
+  refreshers.push(rangeRow(layersGroup, 'density', state, 'layer3Density', 0, 1, 0.01, (v) => params.layer3Density.value = v, () => params.layer3Density.value));
+  refreshers.push(rangeRow(layersGroup, 'spacing', state, 'layer3Span', 3, 12, 0.1, (v) => params.layer3Span.value = v, () => params.layer3Span.value));
+  refreshers.push(rangeRow(layersGroup, 'amplitude', state, 'layer3Amplitude', 0.05, 1.5, 0.05, (v) => params.layer3Amplitude.value = v, () => params.layer3Amplitude.value));
+  refreshers.push(rangeRow(layersGroup, 'frequency', state, 'layer3Frequency', 0.1, 2, 0.05, (v) => params.layer3Frequency.value = v, () => params.layer3Frequency.value));
+  refreshers.push(rangeRow(layersGroup, 'speed', state, 'layer3Speed', 0.1, 3, 0.05, (v) => params.layer3Speed.value = v, () => params.layer3Speed.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';
