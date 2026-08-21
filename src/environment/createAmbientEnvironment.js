@@ -3,68 +3,63 @@ import { Fn, color, float, mix, positionWorldDirection, smoothstep, vec4 } from 
 
 /**
  * Ambiente lejano al plano de partículas:
- * morado arriba · azul abajo (hemisferio + luces puntuales distantes + fondo degradado).
+ * morado arriba · azul abajo (más intenso).
  */
 export function createAmbientEnvironment(scene, params) {
-  // Hemisferio: ilumina el “cielo” morado y el “suelo” azul
-  const hemi = new THREE.HemisphereLight(0x9b6bdb, 0x3a6fd8, 0.55);
+  const hemi = new THREE.HemisphereLight(0xb794f6, 0x3b82f6, 1.15);
   hemi.name = 'AmbientHemi';
   scene.add(hemi);
 
-  // Luz morada lejana, por encima del plano
-  const lightTop = new THREE.PointLight(0xb794f6, 2.4, 120, 1.6);
+  const lightTop = new THREE.PointLight(0xd8b4fe, 5.5, 140, 1.35);
   lightTop.position.set(-6, 32, -8);
   lightTop.name = 'AmbientTopPurple';
   scene.add(lightTop);
 
-  const lightTopB = new THREE.PointLight(0x8b5cf6, 1.6, 100, 1.8);
+  const lightTopB = new THREE.PointLight(0xa78bfa, 4.2, 120, 1.45);
   lightTopB.position.set(10, 28, 14);
   lightTopB.name = 'AmbientTopPurpleB';
   scene.add(lightTopB);
 
-  // Luz azul lejana, por debajo del plano
-  const lightBottom = new THREE.PointLight(0x3b82f6, 2.2, 120, 1.6);
+  const lightBottom = new THREE.PointLight(0x60a5fa, 5.0, 140, 1.35);
   lightBottom.position.set(4, -24, 6);
   lightBottom.name = 'AmbientBottomBlue';
   scene.add(lightBottom);
 
-  const lightBottomB = new THREE.PointLight(0x60a5fa, 1.4, 100, 1.8);
+  const lightBottomB = new THREE.PointLight(0x38bdf8, 3.8, 120, 1.45);
   lightBottomB.position.set(-12, -20, -4);
   lightBottomB.name = 'AmbientBottomBlueB';
   scene.add(lightBottomB);
 
-  // Relleno muy suave para no dejar negros absolutos
-  const fill = new THREE.AmbientLight(0x1a1428, 0.18);
+  const fill = new THREE.AmbientLight(0x2a1a48, 0.42);
   fill.name = 'AmbientFill';
   scene.add(fill);
 
-  // Fondo 3D: degradado por dirección de vista (morado arriba → azul abajo)
   scene.background = null;
   scene.backgroundNode = Fn(() => {
     const y = positionWorldDirection.y;
     const t = smoothstep(float(-0.85), float(0.9), y);
 
-    const bottom = color('#143a8c'); // azul inferior
-    const mid = color('#08060f');
-    const top = color('#6b3fa0'); // morado superior
+    const bottom = color('#1d4ed8');
+    const mid = color('#0a0614');
+    const top = color('#7c3aed');
 
     const lower = mix(bottom, mid, smoothstep(float(-0.85), float(0.05), y));
     const upper = mix(mid, top, smoothstep(float(0.05), float(0.9), y));
     const col = mix(lower, upper, t);
 
-    // Intensidad del ambiente (uniforme del LAB)
-    const lit = col.mul(params.ambientIntensity.mul(0.55).add(0.45));
+    // Más saturado / visible
+    const lit = col.mul(params.ambientIntensity.mul(0.9).add(0.65));
     return vec4(lit, 1.0);
   })();
 
   const syncIntensity = () => {
     const i = params.ambientIntensity.value;
-    hemi.intensity = 0.35 + i * 0.45;
-    lightTop.intensity = 1.2 + i * 2.0;
-    lightTopB.intensity = 0.8 + i * 1.4;
-    lightBottom.intensity = 1.1 + i * 1.8;
-    lightBottomB.intensity = 0.7 + i * 1.2;
-    fill.intensity = 0.1 + i * 0.15;
+    hemi.intensity = 0.7 + i * 0.9;
+    lightTop.intensity = 2.8 + i * 4.5;
+    lightTopB.intensity = 2.0 + i * 3.5;
+    lightBottom.intensity = 2.6 + i * 4.2;
+    lightBottomB.intensity = 1.8 + i * 3.2;
+    fill.intensity = 0.25 + i * 0.35;
   };
   syncIntensity();
 

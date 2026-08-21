@@ -23,13 +23,16 @@ export function createParameters() {
     trailStretch: uniform(2.8),
     trailDamp: uniform(0.9),
     glowFalloff: uniform(7.5),
-    bloomStrength: uniform(0.45),
-    bloomRadius: uniform(0.55),
-    bloomThreshold: uniform(0.22),
+    bloomStrength: uniform(0.18),
+    bloomRadius: uniform(0.35),
+    bloomThreshold: uniform(0.45),
 
     // Ambiente lejano · morado arriba / azul abajo
-    ambientIntensity: uniform(0.85),
-    ambientMix: uniform(0.14),
+    ambientIntensity: uniform(1.25),
+    ambientMix: uniform(0.28),
+
+    // Glitch (0 = limpio · 1 = fuerte)
+    glitchAmount: uniform(0.45),
 
     // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),

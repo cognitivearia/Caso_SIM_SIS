@@ -606,18 +606,36 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
 
     // Lavado ambiental lejano: morado arriba · azul abajo (según altura de la partícula)
     const ambT = smoothstep(float(-0.4), float(3.2), pos.y);
-    const ambPurple = color('#9b6bdb');
-    const ambBlue = color('#3a6fd8');
+    const ambPurple = color('#b794f6');
+    const ambBlue = color('#60a5fa');
     const ambWash = mix(ambBlue, ambPurple, ambT).mul(params.ambientMix).mul(params.ambientIntensity);
     const litAmb = lit.add(ambWash);
 
-    const bloomBoost = float(1.0).add(speedT.mul(0.55));
-    return vec4(litAmb.mul(bloomBoost), 1.0);
+    // Glitch en partícula: saltos de canal y destellos irregulares
+    const gAmt = params.glitchAmount;
+    const gNoise = fract(sin(pos.x.mul(17.3).add(pos.z.mul(9.1)).add(params.time.mul(11.0))).mul(43758.5453));
+    const gKick = step(float(0.94).sub(gAmt.mul(0.2)), gNoise);
+    const chanSnap = mix(
+      litAmb,
+      vec3(litAmb.b, litAmb.r, litAmb.g).mul(1.25),
+      gKick.mul(gAmt)
+    );
+    const tearFlash = mix(float(1.0), float(1.55), gKick.mul(gAmt).mul(
+      step(float(0.5), fract(sin(params.time.mul(23.0).add(pos.y.mul(5.0))).mul(991.0)))
+    ));
+
+    const bloomBoost = float(1.0).add(speedT.mul(0.28));
+    return vec4(chanSnap.mul(bloomBoost).mul(tearFlash), 1.0);
   })();
 
-  // Glow suave (no círculo duro): cae en gaussiana → halo de luz
+  // Glow suave + micro-jitter UV cuando hay glitch
   material.opacityNode = Fn(() => {
-    const d = uv().sub(0.5).length();
+    const g = params.glitchAmount;
+    const jitter = vec2(
+      sin(params.time.mul(37.0).add(uv().y.mul(70.0))).mul(g.mul(0.03)),
+      cos(params.time.mul(29.0).add(uv().x.mul(50.0))).mul(g.mul(0.015))
+    );
+    const d = uv().add(jitter).sub(0.5).length();
     return exp(d.mul(d).mul(params.glowFalloff.mul(-1.0))).mul(0.95);
   })();
 
