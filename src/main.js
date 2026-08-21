@@ -7,7 +7,7 @@ import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
-const PARTICLE_COUNT = 524288; // 2^19 — más densidad, partículas más pequeñas
+const PARTICLE_COUNT = 524288;
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -43,6 +43,7 @@ async function main() {
   let mode = 'LAB';
   let elapsed = 0;
   let panel;
+  let ready = false;
 
   const layers = {
     cornerVortices: { on: false }
@@ -109,13 +110,19 @@ async function main() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
+  // Init primero; el loop solo anima cuando ready
   simulation.reset();
+  ready = true;
 
   renderer.setAnimationLoop(() => {
-    if (!paused) {
+    if (ready && !paused) {
       elapsed += params.dt.value * params.timeScale.value;
       params.time.value = elapsed;
-      simulation.stepSimulation();
+      try {
+        simulation.stepSimulation();
+      } catch (err) {
+        console.error('Compute update failed:', err);
+      }
     }
     orbit.update();
     renderer.render(scene, camera);
