@@ -64,7 +64,9 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
     waveSpeed: params.waveSpeed.value,
     planeSpring: params.planeSpring.value,
     layer1Attract: params.layer1Attract.value,
-    layer1Vortex: params.layer1Vortex.value
+    layer1Vortex: params.layer1Vortex.value,
+    layer1Flow: params.layer1Flow.value,
+    layer1Chaos: params.layer1Chaos.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -75,14 +77,14 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
 
   const layersGroup = document.createElement('div');
   layersGroup.className = 'group';
-  layersGroup.innerHTML = '<h2>Capas (presets)</h2><p>1: dos vórtices de atracción (esquina superior-derecha e inferior-izquierda).</p>';
+  layersGroup.innerHTML = '<h2>Capas (presets)</h2><p>1: vórtices en esquinas TR/BL con zonas de influencia diagonales (caos + flujo).</p>';
   panel.append(layersGroup);
 
   const layerStatus = document.createElement('p');
   layerStatus.style.margin = '6px 0 0';
   const refreshLayerStatus = () => {
     layerStatus.textContent = layers.cornerVortices.on
-      ? 'Capa 1: ON · vórtices TR + BL'
+      ? 'Capa 1: ON · TR + BL con zonas azules'
       : 'Capa 1: OFF';
   };
   refreshLayerStatus();
@@ -90,8 +92,10 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
   refreshers.push({ refresh: refreshLayerStatus });
 
   button(layersGroup, '1 · Vórtices esquinas (toggle)', () => onToggleLayer('cornerVortices'));
-  refreshers.push(rangeRow(layersGroup, 'attract', state, 'layer1Attract', 0, 14, 0.1, (v) => params.layer1Attract.value = v, () => params.layer1Attract.value));
-  refreshers.push(rangeRow(layersGroup, 'vortex spin', state, 'layer1Vortex', 0, 10, 0.1, (v) => params.layer1Vortex.value = v, () => params.layer1Vortex.value));
+  refreshers.push(rangeRow(layersGroup, 'attract', state, 'layer1Attract', 0, 16, 0.1, (v) => params.layer1Attract.value = v, () => params.layer1Attract.value));
+  refreshers.push(rangeRow(layersGroup, 'vortex spin', state, 'layer1Vortex', 0, 12, 0.1, (v) => params.layer1Vortex.value = v, () => params.layer1Vortex.value));
+  refreshers.push(rangeRow(layersGroup, 'flow', state, 'layer1Flow', 0, 8, 0.1, (v) => params.layer1Flow.value = v, () => params.layer1Flow.value));
+  refreshers.push(rangeRow(layersGroup, 'chaos', state, 'layer1Chaos', 0, 6, 0.1, (v) => params.layer1Chaos.value = v, () => params.layer1Chaos.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';

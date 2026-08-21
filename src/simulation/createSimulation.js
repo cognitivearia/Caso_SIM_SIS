@@ -2,15 +2,16 @@ import * as THREE from 'three/webgpu';
 import {
   Fn,
   If,
+  abs,
   color,
   float,
   hash,
   instanceIndex,
   instancedArray,
   max,
-  min,
   mix,
   sin,
+  smoothstep,
   step,
   uint,
   uv,
@@ -18,19 +19,7 @@ import {
   vec4
 } from 'three/tsl';
 
-function vortexForce(p, center, attract, swirl, softening) {
-  const toCenter = center.sub(p);
-  const dist = max(toCenter.length(), softening);
-  const radial = toCenter.div(dist);
-  // Atracción hacia el centro del vórtice
-  const pull = radial.mul(attract).div(dist.add(0.25));
-  // Giro tangencial alrededor del eje de visión aproximado (Z)
-  const tangent = vec3(0.0, 0.0, 1.0).cross(radial);
-  const spin = tangent.mul(swirl).div(dist.add(0.4));
-  return pull.add(spin);
-}
-
-export function createSimulation({ renderer, scene, params, count = 262144 }) {
+export function createSimulation({ renderer, scene, params, count = 524288 }) {
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
   const homeBuffer = instancedArray(count, 'vec3');
@@ -55,9 +44,10 @@ export function createSimulation({ renderer, scene, params, count = 262144 }) {
   })().compute(count).setName('Initialize Horizon Plane');
 
   const updateParticles = Fn(() => {
-    const p = positionBuffer.element(instanceIndex);
-    const v = velocityBuffer.element(instanceIndex);
-    const home = homeBuffer.element(instanceIndex);
+    const i = instanceIndex;
+    const p = positionBuffer.element(i);
+    const v = velocityBuffer.element(i);
+    const home = homeBuffer.element(i);
 
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
@@ -78,29 +68,60 @@ export function createSimulation({ renderer, scene, params, count = 262144 }) {
     const baseTarget = vec3(home.x, home.y.add(wave), home.z);
     const springK = params.planeSpring.toVar();
 
-    // --- CAPA 1: dos vórtices de atracción (esquinas) ---
+    // --- CAPA 1: zonas azules + vórtices rojos ---
     If(params.layer1Enabled.greaterThan(0.5), () => {
-      const fTR = vortexForce(
-        p,
-        params.vortexTR,
-        params.layer1Attract,
-        params.layer1Vortex,
-        params.layer1Softening
-      );
-      const fBL = vortexForce(
-        p,
-        params.vortexBL,
-        params.layer1Attract,
-        params.layer1Vortex,
-        params.layer1Softening
-      );
-      force.addAssign(fTR.add(fBL));
+      // Diagonal TL→BR (canal azul): separa influencia TR vs BL
+      // valor > 0 → lado superior-derecha; < 0 → inferior-izquierda
+      const sample = mix(home, p, 0.35);
+      const diag = sample.x.mul(0.65).sub(sample.z.sub(4.5).mul(0.55));
+      const wTR = smoothstep(-0.35, 1.1, diag);
+      const wBL = smoothstep(-0.35, 1.1, diag.mul(-1.0));
 
-      // Cerca de un vórtice, afloja el anclaje al plano para que el remolino se lea
-      const dTR = max(params.vortexTR.sub(p).length(), 0.01);
-      const dBL = max(params.vortexBL.sub(p).length(), 0.01);
-      const near = float(1.0).sub(min(dTR, dBL).div(4.5).clamp(0.0, 1.0));
-      springK.assign(params.planeSpring.mul(float(1.0).sub(near.mul(0.9))));
+      // Ligero solape caótico cerca del canal
+      const seam = float(1.0).sub(abs(diag).mul(0.55)).clamp(0.0, 1.0);
+
+      const toTR = params.vortexTR.sub(p);
+      const toBL = params.vortexBL.sub(p);
+      const dTR = max(toTR.length(), params.layer1Softening);
+      const dBL = max(toBL.length(), params.layer1Softening);
+      const dirTR = toTR.div(dTR);
+      const dirBL = toBL.div(dBL);
+
+      // Flujo direccional (flechas azules): TR ← arriba-derecha; BL ← abajo-izquierda
+      const flowTR = vec3(0.75, 0.15, -0.55).normalize();
+      const flowBL = vec3(-0.75, 0.1, 0.6).normalize();
+
+      // Atracción + flujo (más fuerte lejos del núcleo, para arrastrar la zona)
+      const pullTR = dirTR.mul(params.layer1Attract).div(dTR.add(0.5))
+        .add(flowTR.mul(params.layer1Flow).mul(smoothstep(0.0, 5.0, dTR)));
+      const pullBL = dirBL.mul(params.layer1Attract).div(dBL.add(0.5))
+        .add(flowBL.mul(params.layer1Flow).mul(smoothstep(0.0, 5.0, dBL)));
+
+      // Giro opuesto en cada vórtice (eje Y → remolino en el plano)
+      const swirlPhase = sin(params.time.mul(1.7)).mul(0.25).add(1.0);
+      const spinTR = vec3(0.0, 1.0, 0.0).cross(dirTR)
+        .mul(params.layer1Vortex).div(dTR.add(0.35)).mul(swirlPhase);
+      const spinBL = vec3(0.0, 1.0, 0.0).cross(dirBL)
+        .mul(params.layer1Vortex.mul(-1.15)).div(dBL.add(0.35))
+        .mul(sin(params.time.mul(1.3)).mul(0.3).add(1.0));
+
+      // Turbulencia local (caos visual)
+      const n1 = hash(i.add(uint(101))).sub(0.5);
+      const n2 = hash(i.add(uint(207))).sub(0.5);
+      const n3 = hash(i.add(uint(313))).sub(0.5);
+      const wobble = vec3(
+        sin(p.z.mul(1.8).add(params.time.mul(2.4)).add(n1.mul(6.28))),
+        cos(p.x.mul(1.3).add(params.time.mul(1.9)).add(n2.mul(6.28))).mul(0.55),
+        sin(p.x.mul(1.1).sub(p.z.mul(0.9)).add(params.time.mul(2.1)).add(n3.mul(6.28)))
+      ).mul(params.layer1Chaos).mul(wTR.add(wBL).mul(0.5).add(seam.mul(0.35)));
+
+      force.addAssign(pullTR.add(spinTR).mul(wTR));
+      force.addAssign(pullBL.add(spinBL).mul(wBL));
+      force.addAssign(wobble);
+
+      // En zona de influencia, el plano suelta (el canal diagonal también se agita)
+      const influence = max(wTR, wBL).mul(0.92).add(seam.mul(0.25)).clamp(0.0, 0.95);
+      springK.assign(params.planeSpring.mul(float(1.0).sub(influence)));
     });
 
     force.addAssign(baseTarget.sub(p).mul(springK));
@@ -132,7 +153,7 @@ export function createSimulation({ renderer, scene, params, count = 262144 }) {
     const foam = color('#8ec8ff');
     const hot = color('#ffb35a');
     const base = mix(dune, foam, heightT);
-    return vec4(mix(base, hot, speedT.mul(0.45)), 1.0);
+    return vec4(mix(base, hot, speedT.mul(0.55)), 1.0);
   })();
 
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
