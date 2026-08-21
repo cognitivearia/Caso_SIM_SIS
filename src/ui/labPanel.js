@@ -43,13 +43,21 @@ function button(parent, label, onClick) {
   return b;
 }
 
-export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeChange, onPauseChange }) {
+export function createLabPanel({
+  params,
+  layers,
+  onReset,
+  onToggleLayer,
+  onModeChange,
+  onPauseChange,
+  onChaosChange
+}) {
   const refreshers = [];
   const panel = document.createElement('aside');
   panel.className = 'panel';
   panel.innerHTML = `
     <h1>Horizon · Layer Forces</h1>
-    <p>Base: plano hacia el horizonte (olas/dunas). Los presets son <strong>capas</strong> on/off. Sin mouse.</p>
+    <p>Base: plano olas/dunas. Capas on/off. <strong>2</strong> forma redes neuronales.</p>
   `;
 
   const sim = document.createElement('div');
@@ -66,7 +74,10 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
     layer1Attract: params.layer1Attract.value,
     layer1Vortex: params.layer1Vortex.value,
     layer1Flow: params.layer1Flow.value,
-    layer1Chaos: params.layer1Chaos.value
+    layer1Chaos: params.layer1Chaos.value,
+    layer2Spring: params.layer2Spring.value,
+    layer2BranchLen: params.layer2BranchLen.value,
+    layer2Pulse: params.layer2Pulse.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -77,25 +88,43 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
 
   const layersGroup = document.createElement('div');
   layersGroup.className = 'group';
-  layersGroup.innerHTML = '<h2>Capas (presets)</h2><p>1: vórtices en esquinas TR/BL con zonas de influencia diagonales (caos + flujo).</p>';
+  layersGroup.innerHTML = '<h2>Capas (presets)</h2>';
   panel.append(layersGroup);
 
   const layerStatus = document.createElement('p');
   layerStatus.style.margin = '6px 0 0';
   const refreshLayerStatus = () => {
-    layerStatus.textContent = layers.cornerVortices.on
-      ? 'Capa 1: ON · TR + BL con zonas azules'
-      : 'Capa 1: OFF';
+    const l1 = layers.cornerVortices.on ? 'ON' : 'off';
+    const l2 = layers.neuralNet.on ? 'ON' : 'off';
+    layerStatus.textContent = `1 vórtices: ${l1} · 2 neuronas: ${l2}`;
   };
   refreshLayerStatus();
   layersGroup.append(layerStatus);
   refreshers.push({ refresh: refreshLayerStatus });
 
-  button(layersGroup, '1 · Vórtices esquinas (toggle)', () => onToggleLayer('cornerVortices'));
+  button(layersGroup, '1 · Vórtices esquinas', () => onToggleLayer('cornerVortices'));
   refreshers.push(rangeRow(layersGroup, 'attract', state, 'layer1Attract', 0, 16, 0.1, (v) => params.layer1Attract.value = v, () => params.layer1Attract.value));
   refreshers.push(rangeRow(layersGroup, 'vortex spin', state, 'layer1Vortex', 0, 12, 0.1, (v) => params.layer1Vortex.value = v, () => params.layer1Vortex.value));
   refreshers.push(rangeRow(layersGroup, 'flow', state, 'layer1Flow', 0, 8, 0.1, (v) => params.layer1Flow.value = v, () => params.layer1Flow.value));
-  refreshers.push(rangeRow(layersGroup, 'chaos', state, 'layer1Chaos', 0, 6, 0.1, (v) => params.layer1Chaos.value = v, () => params.layer1Chaos.value));
+  refreshers.push(rangeRow(
+    layersGroup,
+    'chaos',
+    state,
+    'layer1Chaos',
+    0,
+    6,
+    0.1,
+    (v) => {
+      params.layer1Chaos.value = v;
+      onChaosChange?.();
+    },
+    () => params.layer1Chaos.value
+  ));
+
+  button(layersGroup, '2 · Redes neuronales', () => onToggleLayer('neuralNet'));
+  refreshers.push(rangeRow(layersGroup, 'neural spring', state, 'layer2Spring', 2, 18, 0.1, (v) => params.layer2Spring.value = v, () => params.layer2Spring.value));
+  refreshers.push(rangeRow(layersGroup, 'branch length', state, 'layer2BranchLen', 1, 5, 0.05, (v) => params.layer2BranchLen.value = v, () => params.layer2BranchLen.value));
+  refreshers.push(rangeRow(layersGroup, 'soma pulse', state, 'layer2Pulse', 0, 0.4, 0.01, (v) => params.layer2Pulse.value = v, () => params.layer2Pulse.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';

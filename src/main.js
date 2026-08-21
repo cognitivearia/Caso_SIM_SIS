@@ -9,6 +9,32 @@ import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 524288;
 
+function createPerfChaosSlider(params) {
+  const wrap = document.createElement('div');
+  wrap.className = 'perf-chaos hidden';
+  const input = document.createElement('input');
+  input.type = 'range';
+  input.min = '0';
+  input.max = '6';
+  input.step = '0.1';
+  input.value = String(params.layer1Chaos.value);
+  input.setAttribute('aria-label', 'caos');
+  input.addEventListener('input', () => {
+    params.layer1Chaos.value = Number(input.value);
+  });
+  wrap.append(input);
+  document.body.append(wrap);
+  return {
+    element: wrap,
+    setVisible(visible) {
+      wrap.classList.toggle('hidden', !visible);
+    },
+    sync() {
+      input.value = String(params.layer1Chaos.value);
+    }
+  };
+}
+
 async function main() {
   const mount = document.querySelector('#app');
 
@@ -46,15 +72,19 @@ async function main() {
   let ready = false;
 
   const layers = {
-    cornerVortices: { on: false }
+    cornerVortices: { on: false },
+    neuralNet: { on: false }
   };
+
+  const perfChaos = createPerfChaosSlider(params);
 
   const updateHud = () => {
     const l1 = layers.cornerVortices.on ? 'ON' : 'off';
+    const l2 = layers.neuralNet.on ? 'ON' : 'off';
     if (mode === 'LAB') {
-      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset plano<br>1: vórtices esquinas [${l1}] · capas on/off`;
+      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: vórtices [${l1}] · 2: neuronas [${l2}]`;
     } else {
-      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: vórtices [${l1}]`;
+      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: vórtices [${l1}] · 2: neuronas [${l2}]`;
     }
   };
 
@@ -65,16 +95,28 @@ async function main() {
     updateHud();
   };
 
+  const setLayer2 = (on) => {
+    layers.neuralNet.on = on;
+    params.layer2Enabled.value = on ? 1 : 0;
+    panel?.refresh();
+    updateHud();
+  };
+
   const toggleLayer1 = () => setLayer1(!layers.cornerVortices.on);
+  const toggleLayer2 = () => setLayer2(!layers.neuralNet.on);
 
   const setMode = (next) => {
     mode = next;
-    panel.setVisible(mode === 'LAB');
+    const lab = mode === 'LAB';
+    panel.setVisible(lab);
+    perfChaos.setVisible(!lab);
+    if (!lab) perfChaos.sync();
     updateHud();
   };
 
   const hardReset = () => {
     setLayer1(false);
+    setLayer2(false);
     elapsed = 0;
     params.time.value = 0;
     simulation.reset();
@@ -87,9 +129,11 @@ async function main() {
     onReset: hardReset,
     onToggleLayer: (id) => {
       if (id === 'cornerVortices') toggleLayer1();
+      if (id === 'neuralNet') toggleLayer2();
     },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
-    onPauseChange: () => { paused = !paused; }
+    onPauseChange: () => { paused = !paused; },
+    onChaosChange: () => perfChaos.sync()
   });
 
   const hud = document.createElement('div');
@@ -102,6 +146,7 @@ async function main() {
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     if (event.code === 'KeyR') hardReset();
     if (event.code === 'Digit1') toggleLayer1();
+    if (event.code === 'Digit2') toggleLayer2();
   });
 
   addEventListener('resize', () => {
@@ -110,7 +155,6 @@ async function main() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  // Init primero; el loop solo anima cuando ready
   simulation.reset();
   ready = true;
 

@@ -6,6 +6,7 @@ import {
   color,
   cos,
   float,
+  floor,
   hash,
   instanceIndex,
   instancedArray,
@@ -13,6 +14,7 @@ import {
   mix,
   sin,
   smoothstep,
+  sqrt,
   step,
   uint,
   uv,
@@ -53,11 +55,11 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    // --- BASE: plano que ondula (siempre activo) ---
     const hx = home.x;
     const hy = home.y;
     const hz = home.z;
 
+    // --- BASE: plano que ondula ---
     const wave = sin(hx.mul(params.waveFreqX).add(params.time.mul(params.waveSpeed)))
       .mul(params.waveAmp)
       .add(
@@ -69,10 +71,11 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
           .mul(params.waveAmp.mul(0.35))
       );
 
-    const baseTarget = vec3(hx, hy.add(wave), hz);
+    const baseTarget = vec3(hx, hy.add(wave), hz).toVar();
+    const target = baseTarget.toVar();
+    const springK = params.planeSpring.toVar();
 
-    // --- CAPA 1: pesos (sin If) · diagonal TL→BR ---
-    // Cámara: +X derecha, −Z horizonte (arriba), +Z cerca (abajo)
+    // --- CAPA 1: vórtices TR / BL ---
     const diag = hx.mul(0.65).sub(hz.sub(4.5).mul(0.55));
     const wTR = smoothstep(float(-0.35), float(1.1), diag).mul(params.layer1Enabled);
     const wBL = smoothstep(float(-0.35), float(1.1), diag.mul(-1.0)).mul(params.layer1Enabled);
@@ -85,7 +88,6 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const dirTR = toTR.div(dTR);
     const dirBL = toBL.div(dBL);
 
-    // Flujo direccional (flechas azules)
     const flowTR = vec3(0.80, 0.16, -0.58);
     const flowBL = vec3(-0.78, 0.10, 0.62);
 
@@ -114,10 +116,78 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     force.addAssign(pullBL.add(spinBL).mul(wBL));
     force.addAssign(wobble.mul(wTR.add(wBL).mul(0.5).add(seam.mul(0.35))));
 
-    // Resorte al plano: se afloja dentro de las zonas de influencia
-    const influence = max(wTR, wBL).mul(0.9).add(seam.mul(0.2)).clamp(0.0, 0.92);
-    const springK = params.planeSpring.mul(float(1.0).sub(influence));
-    force.addAssign(baseTarget.sub(p).mul(springK));
+    const influence1 = max(wTR, wBL).mul(0.9).add(seam.mul(0.2)).clamp(0.0, 0.92);
+
+    // --- CAPA 2: redes neuronales (somas + dendritas ramificadas) ---
+    const a = hash(i.add(uint(17)));
+    const b = hash(i.add(uint(41)));
+    const c = hash(i.add(uint(67)));
+    const d = hash(i.add(uint(97)));
+    const e = hash(i.add(uint(131)));
+
+    // 6 hubs fijos en el volumen (predecibles)
+    const h0 = vec3(-2.2, 1.6, 3.2);
+    const h1 = vec3(2.4, 2.1, 2.0);
+    const h2 = vec3(0.1, 2.8, 5.0);
+    const h3 = vec3(-3.1, 1.0, 6.4);
+    const h4 = vec3(3.0, 1.4, 4.2);
+    const h5 = vec3(0.6, 3.2, 1.2);
+
+    const hubSel = floor(a.mul(5.999));
+    const hub = mix(h0, h1, step(0.5, hubSel))
+      .toVar();
+    hub.assign(mix(hub, h2, step(1.5, hubSel)));
+    hub.assign(mix(hub, h3, step(2.5, hubSel)));
+    hub.assign(mix(hub, h4, step(3.5, hubSel)));
+    hub.assign(mix(hub, h5, step(4.5, hubSel)));
+
+    // Soma (~14%) o rama dendrítica
+    const onSoma = step(b, 0.14);
+    const theta = c.mul(6.28318530718);
+    const cosPhi = d.mul(1.6).sub(0.8);
+    const sinPhi = sqrt(max(float(1.0).sub(cosPhi.mul(cosPhi)), 0.05));
+    const branchDir = vec3(sinPhi.mul(cos(theta)), cosPhi.mul(0.85).add(0.15), sinPhi.mul(sin(theta)));
+
+    const t = e.mul(0.92).add(0.04);
+    const len = params.layer2BranchLen.mul(mix(0.55, 1.15, c));
+    // Bifurcación secundaria a mitad de rama
+    const forkGate = step(0.55, b);
+    const forkAngle = a.mul(6.28318530718);
+    const forkDir = vec3(cos(forkAngle), 0.25, sin(forkAngle));
+    const forkT = max(t.sub(0.42), 0.0);
+    const fork = forkDir.mul(forkT.mul(len.mul(0.45))).mul(forkGate);
+
+    const pulse = sin(params.time.mul(1.1).add(a.mul(6.28))).mul(params.layer2Pulse);
+    const somaPos = hub.add(branchDir.mul(float(0.22).add(pulse)));
+    const branchPos = hub.add(branchDir.mul(t.mul(len).mul(float(1.0).add(pulse.mul(0.35))))).add(fork);
+    // Algunos conectores entre hubs vecinos (malla)
+    const other = mix(h0, h5, step(0.5, c));
+    const bridge = mix(hub, other, t.mul(0.85).add(0.08))
+      .add(branchDir.mul(0.15).mul(sin(t.mul(3.14))));
+    const useBridge = step(0.88, b);
+
+    const neuralTarget = mix(
+      mix(branchPos, somaPos, onSoma),
+      bridge,
+      useBridge
+    );
+
+    // Blend hacia red neuronal cuando capa 2 está on
+    target.assign(mix(baseTarget, neuralTarget, params.layer2Enabled));
+    springK.assign(
+      mix(
+        params.planeSpring.mul(float(1.0).sub(influence1)),
+        params.layer2Spring,
+        params.layer2Enabled
+      )
+    );
+
+    // Caos también agita un poco las ramas neuronales
+    force.addAssign(
+      wobble.mul(params.layer2Enabled).mul(0.35)
+    );
+
+    force.addAssign(target.sub(p).mul(springK));
     force.addAssign(v.mul(params.dragCoefficient).mul(-1.0));
 
     v.addAssign(force.mul(dt));
@@ -137,18 +207,34 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
   });
 
   material.positionNode = positionBuffer.toAttribute();
-  material.scaleNode = params.particleSize;
+  // Cerca de hubs (altura media-alta) un poco más grandes → somas legibles
+  material.scaleNode = Fn(() => {
+    const pos = positionBuffer.toAttribute();
+    const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
+    return params.particleSize.mul(mix(1.0, 1.85, hubGlow.mul(params.layer2Enabled)));
+  })();
 
   material.colorNode = Fn(() => {
     const pos = positionBuffer.toAttribute();
     const speed = velocityBuffer.toAttribute().length();
     const heightT = pos.y.mul(0.55).add(0.35).clamp(0.0, 1.0);
     const speedT = speed.div(params.maxSpeed).clamp(0.0, 1.0);
+
+    // Paleta dunas (capa off) vs neuronal (púrpura/sepia + nodos claros)
     const dune = color('#c4a574');
     const foam = color('#8ec8ff');
     const hot = color('#ffb35a');
-    const base = mix(dune, foam, heightT);
-    return vec4(mix(base, hot, speedT.mul(0.55)), 1.0);
+    const planeCol = mix(dune, foam, heightT);
+
+    const axon = color('#6a4a62');
+    const flesh = color('#8b6b5a');
+    const node = color('#f2e6c8');
+    const neuralBase = mix(axon, flesh, heightT.mul(0.7));
+    const nearHub = smoothstep(float(1.2), float(2.8), pos.y);
+    const neuralCol = mix(neuralBase, node, nearHub.mul(0.85));
+
+    const base = mix(planeCol, neuralCol, params.layer2Enabled);
+    return vec4(mix(base, hot, speedT.mul(0.4)), 1.0);
   })();
 
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);

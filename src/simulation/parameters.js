@@ -17,15 +17,20 @@ export function createParameters() {
     waveSpeed: uniform(1.35),
     dragCoefficient: uniform(0.22),
 
-    // Capa 1 · vórtices en esquinas con zonas de influencia
+    // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),
     layer1Attract: uniform(8.5),
     layer1Vortex: uniform(5.5),
     layer1Flow: uniform(3.2),
     layer1Chaos: uniform(2.4),
     layer1Softening: uniform(0.55),
-    // Rojo: superior-derecha (horizonte +X) e inferior-izquierda (cerca + cámara −X)
     vortexTR: uniform(new THREE.Vector3(5.4, 0.65, 0.2)),
-    vortexBL: uniform(new THREE.Vector3(-5.4, 0.45, 9.0))
+    vortexBL: uniform(new THREE.Vector3(-5.4, 0.45, 9.0)),
+
+    // Capa 2 · redes neuronales
+    layer2Enabled: uniform(0.0),
+    layer2Spring: uniform(9.5),
+    layer2Pulse: uniform(0.12),
+    layer2BranchLen: uniform(2.6)
   };
 }
