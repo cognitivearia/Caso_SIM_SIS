@@ -35,6 +35,25 @@ function rangeRow(parent, label, object, key, min, max, step, onInput, getValue)
   };
 }
 
+function checkRow(parent, label, initial, onChange, getValue) {
+  const wrap = document.createElement('div');
+  wrap.className = 'row';
+  const lab = document.createElement('label');
+  const name = document.createElement('span');
+  name.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.checked = initial;
+  input.addEventListener('change', () => onChange(input.checked));
+  lab.append(name, input);
+  wrap.append(lab);
+  parent.append(wrap);
+  return {
+    input,
+    refresh() { if (getValue) input.checked = Boolean(getValue()); }
+  };
+}
+
 function button(parent, label, onClick) {
   const b = document.createElement('button');
   b.textContent = label;
@@ -43,13 +62,13 @@ function button(parent, label, onClick) {
   return b;
 }
 
-export function createLabPanel({ params, onReset, onPulseActor, onModeChange, onPauseChange }) {
+export function createLabPanel({ params, onReset, onPreset, onModeChange, onPauseChange }) {
   const refreshers = [];
   const panel = document.createElement('aside');
   panel.className = 'panel';
   panel.innerHTML = `
-    <h1>Orb · Force Actors</h1>
-    <p>Orbe central. <strong>1</strong> y <strong>2</strong> disparan un pulso único; al terminar vuelve a la esfera.</p>
+    <h1>U3 · Forces Instrument</h1>
+    <p>LAB: aísla fuerzas, predice y prueba. <strong>P</strong> cambia a PERFORMANCE.</p>
   `;
 
   const sim = document.createElement('div');
@@ -61,53 +80,51 @@ export function createLabPanel({ params, onReset, onPulseActor, onModeChange, on
     timeScale: params.timeScale.value,
     maxSpeed: params.maxSpeed.value,
     particleSize: params.particleSize.value,
-    orbRadius: params.orbRadius.value,
-    orbSpringStrength: params.orbSpringStrength.value,
-    dragCoefficient: params.dragCoefficient.value
+    radialStrength: params.radialStrength.value,
+    vortexStrength: params.vortexStrength.value,
+    dragCoefficient: params.dragCoefficient.value,
+    windX: params.wind.value.x,
+    windY: params.wind.value.y
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
   refreshers.push(rangeRow(sim, 'maxSpeed', state, 'maxSpeed', 0.2, 12, 0.1, (v) => params.maxSpeed.value = v, () => params.maxSpeed.value));
   refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.005, 0.1, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
-  refreshers.push(rangeRow(sim, 'orbRadius', state, 'orbRadius', 1, 4, 0.05, (v) => params.orbRadius.value = v, () => params.orbRadius.value));
-  refreshers.push(rangeRow(sim, 'orbSpring', state, 'orbSpringStrength', 1, 20, 0.1, (v) => params.orbSpringStrength.value = v, () => params.orbSpringStrength.value));
-  refreshers.push(rangeRow(sim, 'drag', state, 'dragCoefficient', 0, 1, 0.01, (v) => params.dragCoefficient.value = v, () => params.dragCoefficient.value));
 
-  const actors = document.createElement('div');
-  actors.className = 'group';
-  actors.innerHTML = '<h2>Actores (pulsos)</h2><p>Cada disparo lanza una envolvente que decae sola.</p>';
-  panel.append(actors);
+  const force = document.createElement('div');
+  force.className = 'group';
+  force.innerHTML = '<h2>Fuerzas</h2>';
+  panel.append(force);
 
-  const actorState = {
-    maceStrength: params.maceStrength.value,
-    maceSpikeCount: params.maceSpikeCount.value,
-    maceSharpness: params.maceSharpness.value,
-    waveStrength: params.waveStrength.value,
-    waveFrequency: params.waveFrequency.value,
-    waveSpeed: params.waveSpeed.value,
-    waveWidth: params.waveWidth.value
-  };
+  refreshers.push(checkRow(force, 'Radial', params.radialEnabled.value > 0, (v) => params.radialEnabled.value = v ? 1 : 0, () => params.radialEnabled.value > 0));
+  refreshers.push(rangeRow(force, 'radialStrength', state, 'radialStrength', -8, 8, 0.05, (v) => params.radialStrength.value = v, () => params.radialStrength.value));
+  refreshers.push(checkRow(force, 'Vórtice', params.vortexEnabled.value > 0, (v) => params.vortexEnabled.value = v ? 1 : 0, () => params.vortexEnabled.value > 0));
+  refreshers.push(rangeRow(force, 'vortexStrength', state, 'vortexStrength', -8, 8, 0.05, (v) => params.vortexStrength.value = v, () => params.vortexStrength.value));
+  refreshers.push(checkRow(force, 'Drag', params.dragEnabled.value > 0, (v) => params.dragEnabled.value = v ? 1 : 0, () => params.dragEnabled.value > 0));
+  refreshers.push(rangeRow(force, 'dragCoefficient', state, 'dragCoefficient', 0, 1, 0.01, (v) => params.dragCoefficient.value = v, () => params.dragCoefficient.value));
+  refreshers.push(checkRow(force, 'Viento', params.windEnabled.value > 0, (v) => params.windEnabled.value = v ? 1 : 0, () => params.windEnabled.value > 0));
+  refreshers.push(rangeRow(force, 'wind.x', state, 'windX', -4, 4, 0.05, (v) => params.wind.value.x = v, () => params.wind.value.x));
+  refreshers.push(rangeRow(force, 'wind.y', state, 'windY', -4, 4, 0.05, (v) => params.wind.value.y = v, () => params.wind.value.y));
 
-  actors.insertAdjacentHTML('beforeend', '<h2 style="margin-top:12px">1 · Maza</h2>');
-  button(actors, 'Disparar maza (1)', () => onPulseActor('mace'));
-  refreshers.push(rangeRow(actors, 'maceStrength', actorState, 'maceStrength', 0, 2, 0.05, (v) => params.maceStrength.value = v, () => params.maceStrength.value));
-  refreshers.push(rangeRow(actors, 'maceSpikeCount', actorState, 'maceSpikeCount', 4, 20, 1, (v) => params.maceSpikeCount.value = v, () => params.maceSpikeCount.value));
-  refreshers.push(rangeRow(actors, 'maceSharpness', actorState, 'maceSharpness', 2, 20, 0.5, (v) => params.maceSharpness.value = v, () => params.maceSharpness.value));
-
-  actors.insertAdjacentHTML('beforeend', '<h2 style="margin-top:12px">2 · Ondas X</h2>');
-  button(actors, 'Disparar ondas (2)', () => onPulseActor('wave'));
-  refreshers.push(rangeRow(actors, 'waveStrength', actorState, 'waveStrength', 0, 1.5, 0.05, (v) => params.waveStrength.value = v, () => params.waveStrength.value));
-  refreshers.push(rangeRow(actors, 'waveFrequency', actorState, 'waveFrequency', 1, 10, 0.1, (v) => params.waveFrequency.value = v, () => params.waveFrequency.value));
-  refreshers.push(rangeRow(actors, 'waveSpeed', actorState, 'waveSpeed', 0.5, 12, 0.1, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
-  refreshers.push(rangeRow(actors, 'waveWidth', actorState, 'waveWidth', 0.15, 1.5, 0.05, (v) => params.waveWidth.value = v, () => params.waveWidth.value));
+  const tests = document.createElement('div');
+  tests.className = 'group';
+  tests.innerHTML = '<h2>Pruebas de comportamiento</h2><p>Antes de pulsar una prueba, predice qué debería ocurrir.</p>';
+  panel.append(tests);
+  for (const [id, label] of [
+    ['inertia', '1 · Inercia'],
+    ['wind', '2 · Fuerza constante +X'],
+    ['attract', '3 · Atracción'],
+    ['repel', '4 · Repulsión'],
+    ['vortex', '5 · Vórtice']
+  ]) button(tests, label, () => onPreset(id));
 
   const actions = document.createElement('div');
   actions.className = 'group';
   actions.innerHTML = '<h2>Acciones</h2>';
   panel.append(actions);
-  button(actions, 'Reset orbe (R)', onReset);
+  button(actions, 'Reset', onReset);
   button(actions, 'Pausar / continuar', () => onPauseChange());
-  button(actions, 'LAB / PERFORMANCE (P)', () => onModeChange());
+  button(actions, 'LAB / PERFORMANCE', () => onModeChange());
 
   document.body.append(panel);
 

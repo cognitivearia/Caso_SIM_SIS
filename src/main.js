@@ -7,11 +7,20 @@ import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
-const PARTICLE_COUNT = 131072;
-const PULSE_ATTACK = 0.04;
-const PULSE_HOLD = 0.12;
-const PULSE_DECAY = 0.55;
-const PULSE_TOTAL = PULSE_ATTACK + PULSE_HOLD + PULSE_DECAY;
+/*
+2^15: 32768
+2^16: 65536
+2^17: 131072
+2^18: 262144
+2^19: 524288
+2^20: 1048576
+2^21: 2097152
+2^22: 4194304
+2^23: 8388608
+2^24: 16777216
+*/
+
+const PARTICLE_COUNT = 131072; //2^17. Increase only after measuring performance.
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -21,6 +30,7 @@ async function main() {
     throw new Error('Este proyecto requiere WebGPU para ejecutar compute shaders.');
   }
 
+  // THREE.JS MENTAL MODEL: scene + camera + renderer ---------------------
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#050607');
 
@@ -40,52 +50,67 @@ async function main() {
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
 
-  // Sin armature / wireframe del orbe
+  // LAB HELPERS -----------------------------------------------------------
+  const attractorHelper = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 16, 12),
+    new THREE.MeshBasicMaterial({ color: '#ffffff' })
+  );
+  scene.add(attractorHelper);
   const axes = new THREE.AxesHelper(1.5);
-  axes.visible = false;
   scene.add(axes);
+
+  // POINTER -> WORLD POSITION --------------------------------------------
+  // This is a useful camera concept: screen coordinates are not world coords.
+  const pointerNdc = new THREE.Vector2();
+  const raycaster = new THREE.Raycaster();
+  const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  const hit = new THREE.Vector3();
+
+  addEventListener('pointermove', (event) => {
+    pointerNdc.x = (event.clientX / innerWidth) * 2 - 1;
+    pointerNdc.y = -(event.clientY / innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+    if (raycaster.ray.intersectPlane(interactionPlane, hit)) {
+      params.attractor.value.copy(hit);
+      attractorHelper.position.copy(hit);
+    }
+  });
 
   let paused = false;
   let mode = 'LAB';
-  let elapsed = 0;
   let panel;
+  let savedRadialStrength = params.radialStrength.value;
+  let savedRadialEnabled = params.radialEnabled.value;
 
-  const pulses = {
-    mace: { t0: -999, live: false },
-    wave: { t0: -999, live: false }
-  };
+  const applyPreset = (id) => {
+    params.windEnabled.value = 0;
+    params.radialEnabled.value = 0;
+    params.vortexEnabled.value = 0;
+    params.dragEnabled.value = 0;
+    params.wind.value.set(0, 0, 0);
+    params.initialSpeed.value = 0;
 
-  // Envolvente ADS: sube, sostiene un instante y cae a 0 (pulso único)
-  const envelope = (t0) => {
-    const age = elapsed - t0;
-    if (age < 0 || age >= PULSE_TOTAL) return 0;
-    if (age < PULSE_ATTACK) return age / PULSE_ATTACK;
-    if (age < PULSE_ATTACK + PULSE_HOLD) return 1;
-    const decayAge = age - PULSE_ATTACK - PULSE_HOLD;
-    return 1 - decayAge / PULSE_DECAY;
-  };
-
-  const anyPulseLive = () => pulses.mace.live || pulses.wave.live;
-
-  const updateHud = () => {
-    const mace = pulses.mace.live ? 'pulse' : '—';
-    const wave = pulses.wave.live ? 'pulse' : '—';
-    if (mode === 'LAB') {
-      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: maza [${mace}] · 2: ondas X [${wave}] · cada pulso vuelve al orbe`;
-    } else {
-      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: maza [${mace}] · 2: ondas X [${wave}]`;
+    if (id === 'inertia') {
+      params.initialSpeed.value = 0.8;
+    } else if (id === 'wind') {
+      params.windEnabled.value = 1;
+      params.wind.value.set(1.5, 0, 0);
+    } else if (id === 'attract') {
+      params.radialEnabled.value = 1;
+      params.radialStrength.value = 3.0;
+    } else if (id === 'repel') {
+      params.radialEnabled.value = 1;
+      params.radialStrength.value = -3.0;
+    } else if (id === 'vortex') {
+      params.radialEnabled.value = 1;
+      params.radialStrength.value = 1.0;
+      params.vortexEnabled.value = 1;
+      params.vortexStrength.value = 3.0;
+      params.dragEnabled.value = 1;
+      params.dragCoefficient.value = 0.08;
     }
-  };
-
-  const triggerPulse = (name) => {
-    // Reinicia el pulso desde cero (siempre único, no acumula estado ON)
-    pulses[name].t0 = elapsed;
-    pulses[name].live = true;
-    if (name === 'wave') {
-      params.waveOriginTime.value = elapsed;
-    }
-    params.recoveryBoost.value = 1.0;
-    updateHud();
+    simulation.reset();
+    panel?.refresh();
   };
 
   const setMode = (next) => {
@@ -93,25 +118,20 @@ async function main() {
     const lab = mode === 'LAB';
     panel.setVisible(lab);
     axes.visible = lab;
-    updateHud();
+    attractorHelper.visible = lab;
+    //orbit.enabled = lab;
+    hud.innerHTML = lab
+      ? '<strong>LAB</strong> · P: performance · R: reset · 1–5: pruebas'
+      //: '<strong>PERFORMANCE</strong> · P: lab · espacio: invertir radial · puntero: atractor';
+      : '';
   };
 
   panel = createLabPanel({
     params,
-    onReset: () => {
-      pulses.mace.t0 = -999;
-      pulses.wave.t0 = -999;
-      pulses.mace.live = false;
-      pulses.wave.live = false;
-      params.macePulse.value = 0;
-      params.wavePulse.value = 0;
-      params.recoveryBoost.value = 1;
-      simulation.reset();
-      updateHud();
-    },
-    onPulseActor: triggerPulse,
+    onReset: () => simulation.reset(),
+    onPreset: applyPreset,
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
-    onPauseChange: () => { paused = !paused; }
+    onPauseChange: () => paused = !paused
   });
 
   const hud = document.createElement('div');
@@ -119,22 +139,35 @@ async function main() {
   document.body.append(hud);
   setMode('LAB');
 
+  // BASELINE LIVE INSTRUMENT MAPPING -------------------------------------
+  // Students are expected to redesign this mapping for their own instrument.
   addEventListener('keydown', (event) => {
+    //console.log('radial inverted', params.radialStrength.value);
     if (event.repeat) return;
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
-    if (event.code === 'KeyR') {
-      pulses.mace.t0 = -999;
-      pulses.wave.t0 = -999;
-      pulses.mace.live = false;
-      pulses.wave.live = false;
-      params.macePulse.value = 0;
-      params.wavePulse.value = 0;
-      params.recoveryBoost.value = 1;
-      simulation.reset();
-      updateHud();
+    if (event.code === 'KeyR') simulation.reset();
+    if (event.code === 'Digit1') applyPreset('inertia');
+    if (event.code === 'Digit2') applyPreset('wind');
+    if (event.code === 'Digit3') applyPreset('attract');
+    if (event.code === 'Digit4') applyPreset('repel');
+    if (event.code === 'Digit5') applyPreset('vortex');
+
+    if (event.code === 'Space') {
+      event.preventDefault();
+      //savedRadialStrength = params.radialStrength.value || 2.0;
+      savedRadialStrength = params.radialStrength.value;
+      savedRadialEnabled = params.radialEnabled.value;
+      params.radialEnabled.value = 1;
+      params.radialStrength.value = -(savedRadialStrength || 2.0);
+      //console.log('radial inverted', params.radialStrength.value);
     }
-    if (event.code === 'Digit1') triggerPulse('mace');
-    if (event.code === 'Digit2') triggerPulse('wave');
+  });
+
+  addEventListener('keyup', (event) => {
+    if (event.code === 'Space') {
+      params.radialEnabled.value = savedRadialEnabled;
+      params.radialStrength.value = savedRadialStrength;
+    }
   });
 
   addEventListener('resize', () => {
@@ -145,40 +178,9 @@ async function main() {
 
   simulation.reset();
 
+  // FRAME LOOP ------------------------------------------------------------
   renderer.setAnimationLoop(() => {
-    if (!paused) {
-      elapsed += params.dt.value * params.timeScale.value;
-      params.time.value = elapsed;
-
-      const maceEnv = envelope(pulses.mace.t0);
-      const waveEnv = envelope(pulses.wave.t0);
-      // Corte duro a 0 cuando el pulso termina
-      params.macePulse.value = maceEnv > 0.001 ? maceEnv : 0;
-      params.wavePulse.value = waveEnv > 0.001 ? waveEnv : 0;
-
-      let hudDirty = false;
-      if (pulses.mace.live && maceEnv <= 0) {
-        pulses.mace.live = false;
-        params.macePulse.value = 0;
-        hudDirty = true;
-      }
-      if (pulses.wave.live && waveEnv <= 0) {
-        pulses.wave.live = false;
-        params.wavePulse.value = 0;
-        hudDirty = true;
-      }
-
-      // Tras el pulso, refuerza resorte/drag unos frames para volver al orbe limpio
-      if (!anyPulseLive()) {
-        params.recoveryBoost.value = 2.4;
-      } else {
-        params.recoveryBoost.value = 1.0;
-      }
-
-      if (hudDirty) updateHud();
-
-      simulation.stepSimulation();
-    }
+    if (!paused) simulation.stepSimulation();
     orbit.update();
     renderer.render(scene, camera);
   });
