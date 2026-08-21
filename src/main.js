@@ -8,6 +8,7 @@ import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 131072;
+const PULSE_DURATION = 0.9; // segundos
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -50,25 +51,34 @@ async function main() {
   let elapsed = 0;
   let panel;
 
-  const actorLabel = (enabled) => enabled > 0 ? 'ON' : 'off';
+  const pulses = {
+    mace: { t0: -999, live: false },
+    wave: { t0: -999, live: false }
+  };
+
+  const envelope = (t0) => {
+    const age = elapsed - t0;
+    if (age < 0 || age > PULSE_DURATION) return 0;
+    const attack = Math.min(age / 0.05, 1);
+    return attack * Math.exp(-age * 2.8);
+  };
 
   const updateHud = () => {
-    const mace = actorLabel(params.maceEnabled.value);
-    const wave = actorLabel(params.waveEnabled.value);
+    const mace = pulses.mace.live ? 'pulse' : '—';
+    const wave = pulses.wave.live ? 'pulse' : '—';
     if (mode === 'LAB') {
-      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: maza [${mace}] · 2: ondas X [${wave}]`;
+      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: maza [${mace}] · 2: ondas X [${wave}] · pulsos, no toggle`;
     } else {
-      hud.innerHTML = `<strong>PERFORMANCE</strong> · P: lab · 1: maza [${mace}] · 2: ondas X [${wave}]`;
+      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: maza [${mace}] · 2: ondas X [${wave}]`;
     }
   };
 
-  const toggleActor = (name) => {
-    if (name === 'mace') {
-      params.maceEnabled.value = params.maceEnabled.value > 0 ? 0 : 1;
-    } else if (name === 'wave') {
-      params.waveEnabled.value = params.waveEnabled.value > 0 ? 0 : 1;
+  const triggerPulse = (name) => {
+    pulses[name].t0 = elapsed;
+    pulses[name].live = true;
+    if (name === 'wave') {
+      params.waveOriginTime.value = elapsed;
     }
-    panel?.refresh();
     updateHud();
   };
 
@@ -84,7 +94,7 @@ async function main() {
   panel = createLabPanel({
     params,
     onReset: () => simulation.reset(),
-    onToggleActor: toggleActor,
+    onPulseActor: triggerPulse,
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; }
   });
@@ -98,8 +108,8 @@ async function main() {
     if (event.repeat) return;
     if (event.code === 'KeyP') setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB');
     if (event.code === 'KeyR') simulation.reset();
-    if (event.code === 'Digit1') toggleActor('mace');
-    if (event.code === 'Digit2') toggleActor('wave');
+    if (event.code === 'Digit1') triggerPulse('mace');
+    if (event.code === 'Digit2') triggerPulse('wave');
   });
 
   addEventListener('resize', () => {
@@ -114,6 +124,23 @@ async function main() {
     if (!paused) {
       elapsed += params.dt.value * params.timeScale.value;
       params.time.value = elapsed;
+
+      const maceEnv = envelope(pulses.mace.t0);
+      const waveEnv = envelope(pulses.wave.t0);
+      params.macePulse.value = maceEnv;
+      params.wavePulse.value = waveEnv;
+
+      let hudDirty = false;
+      if (pulses.mace.live && maceEnv <= 0.01) {
+        pulses.mace.live = false;
+        hudDirty = true;
+      }
+      if (pulses.wave.live && waveEnv <= 0.01) {
+        pulses.wave.live = false;
+        hudDirty = true;
+      }
+      if (hudDirty) updateHud();
+
       simulation.stepSimulation();
     }
     orbit.update();

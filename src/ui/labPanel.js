@@ -35,25 +35,6 @@ function rangeRow(parent, label, object, key, min, max, step, onInput, getValue)
   };
 }
 
-function checkRow(parent, label, initial, onChange, getValue) {
-  const wrap = document.createElement('div');
-  wrap.className = 'row';
-  const lab = document.createElement('label');
-  const name = document.createElement('span');
-  name.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = initial;
-  input.addEventListener('change', () => onChange(input.checked));
-  lab.append(name, input);
-  wrap.append(lab);
-  parent.append(wrap);
-  return {
-    input,
-    refresh() { if (getValue) input.checked = Boolean(getValue()); }
-  };
-}
-
 function button(parent, label, onClick) {
   const b = document.createElement('button');
   b.textContent = label;
@@ -62,13 +43,13 @@ function button(parent, label, onClick) {
   return b;
 }
 
-export function createLabPanel({ params, onReset, onToggleActor, onModeChange, onPauseChange }) {
+export function createLabPanel({ params, onReset, onPulseActor, onModeChange, onPauseChange }) {
   const refreshers = [];
   const panel = document.createElement('aside');
   panel.className = 'panel';
   panel.innerHTML = `
     <h1>Orb · Force Actors</h1>
-    <p>Orbe de partículas en el centro. Los actores se activan con <strong>1</strong> y <strong>2</strong> sin reiniciar la simulación.</p>
+    <p>Orbe central. <strong>1</strong> y <strong>2</strong> disparan pulsaciones (no toggle).</p>
   `;
 
   const sim = document.createElement('div');
@@ -94,7 +75,7 @@ export function createLabPanel({ params, onReset, onToggleActor, onModeChange, o
 
   const actors = document.createElement('div');
   actors.className = 'group';
-  actors.innerHTML = '<h2>Actores de fuerza</h2><p>Pulsa el hotkey o el botón para activar/desactivar.</p>';
+  actors.innerHTML = '<h2>Actores (pulsos)</h2><p>Cada disparo lanza una envolvente que decae sola.</p>';
   panel.append(actors);
 
   const actorState = {
@@ -103,24 +84,22 @@ export function createLabPanel({ params, onReset, onToggleActor, onModeChange, o
     maceSharpness: params.maceSharpness.value,
     waveStrength: params.waveStrength.value,
     waveFrequency: params.waveFrequency.value,
-    waveSpeed: params.waveSpeed.value
+    waveSpeed: params.waveSpeed.value,
+    waveWidth: params.waveWidth.value
   };
 
-  refreshers.push(checkRow(actors, '1 · Maza (picos)', params.maceEnabled.value > 0, (v) => {
-    params.maceEnabled.value = v ? 1 : 0;
-  }, () => params.maceEnabled.value > 0));
-  refreshers.push(rangeRow(actors, 'maceStrength', actorState, 'maceStrength', 0, 30, 0.5, (v) => params.maceStrength.value = v, () => params.maceStrength.value));
-  refreshers.push(rangeRow(actors, 'maceSpikeCount', actorState, 'maceSpikeCount', 2, 16, 1, (v) => params.maceSpikeCount.value = v, () => params.maceSpikeCount.value));
-  refreshers.push(rangeRow(actors, 'maceSharpness', actorState, 'maceSharpness', 0.5, 6, 0.1, (v) => params.maceSharpness.value = v, () => params.maceSharpness.value));
-  button(actors, 'Toggle maza (1)', () => onToggleActor('mace'));
+  actors.insertAdjacentHTML('beforeend', '<h2 style="margin-top:12px">1 · Maza</h2>');
+  button(actors, 'Disparar maza (1)', () => onPulseActor('mace'));
+  refreshers.push(rangeRow(actors, 'maceStrength', actorState, 'maceStrength', 0, 50, 0.5, (v) => params.maceStrength.value = v, () => params.maceStrength.value));
+  refreshers.push(rangeRow(actors, 'maceSpikeCount', actorState, 'maceSpikeCount', 4, 20, 1, (v) => params.maceSpikeCount.value = v, () => params.maceSpikeCount.value));
+  refreshers.push(rangeRow(actors, 'maceSharpness', actorState, 'maceSharpness', 2, 20, 0.5, (v) => params.maceSharpness.value = v, () => params.maceSharpness.value));
 
-  refreshers.push(checkRow(actors, '2 · Ondas X', params.waveEnabled.value > 0, (v) => {
-    params.waveEnabled.value = v ? 1 : 0;
-  }, () => params.waveEnabled.value > 0));
-  refreshers.push(rangeRow(actors, 'waveStrength', actorState, 'waveStrength', 0, 10, 0.1, (v) => params.waveStrength.value = v, () => params.waveStrength.value));
-  refreshers.push(rangeRow(actors, 'waveFrequency', actorState, 'waveFrequency', 0.5, 8, 0.1, (v) => params.waveFrequency.value = v, () => params.waveFrequency.value));
-  refreshers.push(rangeRow(actors, 'waveSpeed', actorState, 'waveSpeed', 0.5, 10, 0.1, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
-  button(actors, 'Toggle ondas (2)', () => onToggleActor('wave'));
+  actors.insertAdjacentHTML('beforeend', '<h2 style="margin-top:12px">2 · Ondas X</h2>');
+  button(actors, 'Disparar ondas (2)', () => onPulseActor('wave'));
+  refreshers.push(rangeRow(actors, 'waveStrength', actorState, 'waveStrength', 0, 4, 0.05, (v) => params.waveStrength.value = v, () => params.waveStrength.value));
+  refreshers.push(rangeRow(actors, 'waveFrequency', actorState, 'waveFrequency', 1, 10, 0.1, (v) => params.waveFrequency.value = v, () => params.waveFrequency.value));
+  refreshers.push(rangeRow(actors, 'waveSpeed', actorState, 'waveSpeed', 0.5, 12, 0.1, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
+  refreshers.push(rangeRow(actors, 'waveWidth', actorState, 'waveWidth', 0.15, 1.5, 0.05, (v) => params.waveWidth.value = v, () => params.waveWidth.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';

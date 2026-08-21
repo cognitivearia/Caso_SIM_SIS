@@ -2,13 +2,13 @@ import * as THREE from 'three/webgpu';
 import {
   Fn,
   If,
-  acos,
+  abs,
   atan,
-  clamp,
   color,
   cos,
   exp,
   float,
+  fract,
   hash,
   instanceIndex,
   instancedArray,
@@ -16,7 +16,6 @@ import {
   mix,
   pow,
   sin,
-  smoothstep,
   sqrt,
   step,
   uint,
@@ -62,33 +61,38 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const dist = max(p.length(), 0.001);
     const dir = p.div(dist);
 
-    // Resorte hacia la cáscara del orbe (mantiene la forma esférica)
+    // Resorte hacia la cáscara base del orbe
     const shellError = dist.sub(params.orbRadius);
     force.addAssign(dir.mul(shellError).mul(params.orbSpringStrength).mul(-1.0));
 
-    // Actor 1 · Maza: picos radiales en el exterior del orbe
-    const shellMask = smoothstep(params.orbRadius.mul(0.9), params.orbRadius.mul(1.02), dist)
-      .mul(smoothstep(params.orbRadius.mul(1.2), params.orbRadius.mul(1.0), dist));
-
+    // Actor 1 · Maza: picos triangulares afilados (menos redondeados)
+    // Patrón tipo sierra: crestas estrechas en el ángulo azimut
     const theta = atan(dir.y, dir.x);
-    const phi = acos(clamp(dir.z, -1.0, 1.0));
-    const spikeA = sin(theta.mul(params.maceSpikeCount));
-    const spikeB = sin(phi.mul(params.maceSpikeCount.mul(0.5)));
-    const spikePattern = pow(max(spikeA.mul(spikeB), 0.0), params.maceSharpness);
+    const spikePhase = fract(theta.div(6.28318530718).mul(params.maceSpikeCount).add(0.5));
+    const triangular = abs(spikePhase.sub(0.5)).mul(2.0); // 0 en cresta, 1 en valle
+    const spikePattern = pow(max(float(1.0).sub(triangular.mul(params.maceSharpness.mul(0.45))), 0.0), 1.8);
 
+    // Solo empuja la cáscara exterior hacia fuera en las crestas
+    const outerBias = max(dist.sub(params.orbRadius.mul(0.75)), 0.0).div(params.orbRadius.mul(0.4)).clamp(0.0, 1.0);
     force.addAssign(
-      dir.mul(spikePattern).mul(params.maceStrength).mul(params.maceEnabled).mul(shellMask)
+      dir.mul(spikePattern).mul(params.maceStrength).mul(params.macePulse).mul(outerBias)
     );
 
-    // Actor 2 · Ondas en X desde el centro
-    const wavePhase = params.waveFrequency.mul(p.x).sub(params.time.mul(params.waveSpeed));
-    const waveVal = sin(wavePhase);
-    const yzDistSq = p.y.mul(p.y).add(p.z.mul(p.z));
-    const falloff = exp(yzDistSq.mul(-0.3));
+    // Actor 2 · Ondas: anillos de desplazamiento radial viajando por el eje X
+    // desde el centro hacia ±X (crestas perpendiculares al eje X)
+    const ax = abs(p.x);
+    const localT = max(params.time.sub(params.waveOriginTime), 0.0);
+    const phase = params.waveFrequency.mul(ax).sub(localT.mul(params.waveSpeed));
+    const ring = sin(phase);
+    // Ventana que sigue el frente de onda saliendo del centro
+    const front = localT.mul(params.waveSpeed).div(params.waveFrequency.add(0.001));
+    const frontDist = abs(ax.sub(front));
+    const frontMask = exp(frontDist.mul(frontDist).div(params.waveWidth.mul(params.waveWidth).add(0.001)).mul(-1.0));
+    const radialYZ = sqrt(p.y.mul(p.y).add(p.z.mul(p.z)).add(0.001));
+    const ringShape = radialYZ.div(params.orbRadius.add(0.001)).clamp(0.2, 1.0);
 
-    force.addAssign(
-      vec3(waveVal, 0.0, 0.0).mul(params.waveStrength).mul(params.waveEnabled).mul(falloff)
-    );
+    const waveOffset = ring.mul(params.waveStrength).mul(params.wavePulse).mul(frontMask).mul(ringShape);
+    force.addAssign(dir.mul(waveOffset).mul(params.orbSpringStrength.mul(1.8)));
 
     // Drag lineal
     force.addAssign(v.mul(params.dragCoefficient).mul(params.dragEnabled).mul(-1.0));
@@ -116,13 +120,13 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
   material.colorNode = Fn(() => {
     const speed = velocityBuffer.toAttribute().length();
     const dist = positionBuffer.toAttribute().length();
-    const shellT = dist.div(params.orbRadius).sub(0.95).div(0.15).clamp(0.0, 1.0);
+    const shellT = dist.div(params.orbRadius).sub(0.95).div(0.2).clamp(0.0, 1.0);
     const speedT = speed.div(params.maxSpeed).clamp(0.0, 1.0);
     const core = color('#6ec8ff');
     const edge = color('#ffb35a');
     const hot = color('#ff6b4a');
     const base = mix(core, edge, shellT);
-    return vec4(mix(base, hot, speedT.mul(0.6)), 1.0);
+    return vec4(mix(base, hot, speedT.mul(0.7)), 1.0);
   })();
 
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);

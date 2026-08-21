@@ -2,7 +2,9 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - cursor/orb-force-actors-76ce
   workflow_dispatch:
 
 permissions:
