@@ -279,50 +279,145 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
 
     const sawLinesTarget = vec3(along, sawY.add(0.15), lineZ.add(lineThick));
 
-    // --- CAPA 4: torbellino / maelstrom (cola hacia −Z) ---
+    // --- CAPA 4: torbellino con personalidad (camino del boceto) ---
+    // izquierda → arco arriba → loop grande (arriba-der) → cruce → loop chico → salida +X
+    // Cola / profundidad hacia −Z
     const m1 = hash(i.add(uint(457)));
     const m2 = hash(i.add(uint(509)));
     const m3 = hash(i.add(uint(563)));
     const m4 = hash(i.add(uint(617)));
 
-    // Boca del remolino (más cerca de cámara / +Z) → cola hacia −Z
-    const mouth = vec3(0.0, 1.65, 7.2);
-    // t=0 en el borde exterior brillante; t→1 en el abismo (−Z)
-    // Más partículas en el anillo exterior (densidad alta en el borde)
-    const tFunnel = m1.pow(1.65).clamp(0.02, 0.98);
-    const radius = params.layer4Radius
-      .mul(float(1.0).sub(tFunnel.pow(1.15)))
-      .mul(mix(0.92, 1.08, m2));
-    // Elipse de perspectiva
-    const ellipse = float(0.72);
-    const spiralTheta = m3.mul(6.28318530718)
-      .add(tFunnel.mul(params.layer4Turns).mul(6.28318530718))
+    const sPath = fract(m1.mul(0.92).add(0.04).add(params.time.mul(params.layer4PathSpeed).mul(0.15)));
+    const twopi = float(6.28318530718);
+    const zNear = float(6.2);
+    const zFar = zNear.sub(params.layer4Depth.mul(0.55));
+
+    // Waypoints del boceto (Z más negativo = más profundo / cola)
+    const pStart = vec3(-4.4, 1.65, zNear);
+    const pClimb = vec3(-0.35, 3.35, mix(zNear, zFar, 0.35));
+    const cBig = vec3(2.55, 3.55, mix(zNear, zFar, 0.72));
+    const pCross = vec3(0.15, 2.35, mix(zNear, zFar, 0.48));
+    const cSmall = vec3(-1.55, 1.95, mix(zNear, zFar, 0.28));
+    const pEnd = vec3(4.6, 0.28, mix(zNear, zFar, 0.12));
+
+    // Radios de loops (elipse aplastada como en el dibujo)
+    const bigRx = float(1.55);
+    const bigRy = float(1.05);
+    const bigRz = float(0.7);
+    const smallRx = float(0.9);
+    const smallRy = float(0.7);
+    const smallRz = float(0.42);
+
+    // Puntos de empalme continuo entre tramos
+    const bigEntry = cBig.add(vec3(bigRx, 0.0, bigRz.mul(-0.2)));
+    const bigExit = cBig.add(vec3(bigRx.mul(-0.15), bigRy.mul(-0.85), bigRz.mul(0.35)));
+    const smallEntry = cSmall.add(vec3(smallRx.mul(0.85), smallRy.mul(0.2), smallRz.mul(-0.15)));
+    const smallExit = cSmall.add(vec3(smallRx.mul(0.55), smallRy.mul(-0.75), smallRz.mul(0.25)));
+
+    const inClimb = step(sPath, 0.26);
+    const inBig = step(0.26, sPath).mul(float(1.0).sub(step(0.5, sPath)));
+    const inBridge = step(0.5, sPath).mul(float(1.0).sub(step(0.64, sPath)));
+    const inSmall = step(0.64, sPath).mul(float(1.0).sub(step(0.82, sPath)));
+    const inExit = step(0.82, sPath);
+
+    const tClimb = sPath.div(0.26).clamp(0.0, 1.0);
+    const tBig = sPath.sub(0.26).div(0.24).clamp(0.0, 1.0);
+    const tBridge = sPath.sub(0.5).div(0.14).clamp(0.0, 1.0);
+    const tSmall = sPath.sub(0.64).div(0.18).clamp(0.0, 1.0);
+    const tExit = sPath.sub(0.82).div(0.18).clamp(0.0, 1.0);
+
+    // Ease suave (smoothstep cúbico)
+    const tClimbS = tClimb.mul(tClimb).mul(float(3.0).sub(tClimb.mul(2.0)));
+    const tBridgeS = tBridge.mul(tBridge).mul(float(3.0).sub(tBridge.mul(2.0)));
+    const tExitS = tExit.mul(tExit).mul(float(3.0).sub(tExit.mul(2.0)));
+
+    // 1) Arco de subida (izquierda → arriba-derecha, llega a entrada del loop grande)
+    const climbMid = mix(pStart, pClimb, float(0.55)).add(vec3(0.4, 0.55, -0.35));
+    const climbPos = mix(mix(pStart, climbMid, tClimbS), mix(climbMid, bigEntry, tClimbS), tClimbS);
+
+    // 2) Loop grande: elipse con eje vertical (línea punteada del boceto) + −Z
+    const bigAng = tBig.mul(twopi);
+    const bigPos = cBig.add(vec3(
+      cos(bigAng).mul(bigRx),
+      sin(bigAng).mul(bigRy),
+      cos(bigAng).mul(bigRz.mul(-0.25)).add(sin(bigAng).mul(bigRz.mul(-0.55)))
+    ));
+
+    // 3) Puente: baja cruzando el trazo anterior hacia el loop chico
+    const pathBridge = mix(
+      mix(bigExit, pCross, tBridgeS),
+      mix(pCross, smallEntry, tBridgeS),
+      tBridgeS
+    );
+
+    // 4) Loop chico (centro-izquierda)
+    const smallAng = tSmall.mul(twopi);
+    const smallPos = cSmall.add(vec3(
+      cos(smallAng).mul(smallRx),
+      sin(smallAng).mul(smallRy),
+      sin(smallAng).mul(smallRz.mul(-0.65))
+    ));
+
+    // 5) Salida: barrido hacia +X (flecha del boceto)
+    const exitPos = mix(smallExit, pEnd, tExitS).add(
+      vec3(0.0, sin(tExitS.mul(3.14159)).mul(-0.25), 0.0)
+    );
+
+    const pathCenter = climbPos.mul(inClimb)
+      .add(bigPos.mul(inBig))
+      .add(pathBridge.mul(inBridge))
+      .add(smallPos.mul(inSmall))
+      .add(exitPos.mul(inExit));
+
+    // Tangentes por tramo (orientan el remolino a lo largo del camino)
+    const climbTan = mix(vec3(1.1, 0.85, -0.55), vec3(1.2, 0.15, -0.7), tClimbS);
+    const bigTan = vec3(
+      sin(bigAng).mul(bigRx).mul(-1.0),
+      cos(bigAng).mul(bigRy),
+      sin(bigAng).mul(bigRz.mul(0.25)).add(cos(bigAng).mul(bigRz.mul(-0.55)))
+    );
+    const bridgeTan = mix(vec3(-1.1, -0.7, 0.55), vec3(-0.85, -0.35, 0.25), tBridgeS);
+    const smallTan = vec3(
+      sin(smallAng).mul(smallRx).mul(-1.0),
+      cos(smallAng).mul(smallRy),
+      cos(smallAng).mul(smallRz.mul(-0.65))
+    );
+    const exitTan = vec3(1.25, -0.35, 0.2);
+
+    const pathFwd = climbTan.mul(inClimb)
+      .add(bigTan.mul(inBig))
+      .add(bridgeTan.mul(inBridge))
+      .add(smallTan.mul(inSmall))
+      .add(exitTan.mul(inExit));
+    const pathTangent = pathFwd.div(max(pathFwd.length(), 0.05));
+    const upHint = vec3(0.0, 1.0, 0.0);
+    const pathSide = upHint.cross(pathTangent);
+    const pathSideN = pathSide.div(max(pathSide.length(), 0.05));
+    const pathNormal = pathTangent.cross(pathSideN);
+
+    // Tubo más grueso en los loops; se afila en la salida (cola)
+    const inLoop = max(inBig, inSmall);
+    const whirlR = params.layer4Radius
+      .mul(mix(0.5, 1.35, inLoop))
+      .mul(mix(1.0, 0.32, inExit))
+      .mul(mix(0.85, 1.2, m2));
+
+    const swirl = m3.mul(twopi)
+      .add(sPath.mul(params.layer4Turns).mul(twopi))
       .add(params.time.mul(params.layer4Spin));
-    // Descenso en −Z + ligera caída en Y (embudo)
-    const zPos = mouth.z.sub(tFunnel.mul(params.layer4Depth));
-    const yPos = mouth.y.sub(tFunnel.mul(params.layer4Depth.mul(0.22)));
-    const spiral = vec3(
-      mouth.x.add(cos(spiralTheta).mul(radius)),
-      yPos.add(sin(spiralTheta).mul(radius.mul(ellipse))),
-      zPos
+
+    const orb = pathSideN.mul(cos(swirl)).add(pathNormal.mul(sin(swirl))).mul(whirlR);
+    // Cola hacia −Z (más marcada al avanzar por el camino)
+    const tail = vec3(0.0, -0.08, -1.0).mul(
+      params.layer4Pull.mul(mix(0.2, 0.7, sPath)).mul(whirlR.mul(0.4))
     );
-    // Estelas fragmentadas (trazos tangenciales, look grabado)
-    const tangent = vec3(
-      sin(spiralTheta).mul(-1.0),
-      cos(spiralTheta).mul(ellipse),
-      params.layer4Pull.mul(-0.35)
-    );
-    const tanN = tangent.div(max(tangent.length(), 0.05));
-    const streak = tanN.mul(params.layer4Streak)
-      .mul(mix(0.25, 1.4, m4))
-      .mul(mix(1.15, 0.35, tFunnel)); // trazos más largos afuera
-    // Jitter orgánico (no perfecto)
-    const jitter = vec3(
-      m1.sub(0.5),
-      m2.sub(0.5).mul(0.6),
-      m3.sub(0.5).mul(0.4)
-    ).mul(mix(0.08, 0.02, tFunnel));
-    const maelstromTarget = spiral.add(streak.mul(m4.sub(0.5).mul(2.0))).add(jitter);
+
+    const streakDir = pathSideN.mul(sin(swirl).mul(-1.0)).add(pathNormal.mul(cos(swirl))).add(pathTangent.mul(0.45));
+    const streakN = streakDir.div(max(streakDir.length(), 0.05));
+    const streak = streakN.mul(params.layer4Streak).mul(mix(0.3, 1.35, m4)).mul(mix(1.15, 0.4, sPath));
+
+    const jitter = vec3(m1.sub(0.5), m2.sub(0.5).mul(0.7), m3.sub(0.5).mul(0.5)).mul(0.06);
+    const maelstromTarget = pathCenter.add(orb).add(tail).add(streak.mul(m4.sub(0.5).mul(2.0))).add(jitter);
 
     // Blend de capas (base → neuronas → sierra → torbellino)
     target.assign(mix(baseTarget, neuralTarget, params.layer2Enabled));
@@ -371,9 +466,8 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
     const neuralScale = mix(0.45, 1.55, hubGlow);
     const sawScale = mix(1.35, 0.5, params.layer3Density);
-    // Torbellino: puntos más grandes en el anillo exterior, finos hacia la cola (−Z)
-    const depthT = float(7.2).sub(pos.z).div(params.layer4Depth.add(0.01)).clamp(0.0, 1.0);
-    const maelScale = mix(1.15, 0.35, depthT);
+    // Torbellino: más grueso en loops, más fino hacia la salida
+    const maelScale = mix(1.05, 0.55, pos.x.mul(0.08).add(0.5).clamp(0.0, 1.0));
     const layered = mix(1.0, neuralScale, params.layer2Enabled);
     const afterSaw = mix(layered, sawScale, params.layer3Enabled);
     return params.particleSize.mul(mix(afterSaw, maelScale, params.layer4Enabled));
@@ -404,12 +498,12 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const sawWarm = color('#e8f0ff');
     const sawCol = mix(sawCold, sawWarm, heightT);
 
-    // Blanco/crema → negro hacia la cola (look grabado)
-    const funnelT = float(7.2).sub(pos.z).div(params.layer4Depth.add(0.01)).clamp(0.0, 1.0);
+    // Blanco/crema → más oscuro hacia −Z y salida (look grabado)
+    const funnelT = float(6.2).sub(pos.z).div(4.5).clamp(0.0, 1.0);
     const inkWhite = color('#f2f0ea');
     const inkGrey = color('#8a8680');
     const inkBlack = color('#0a0a0a');
-    const maelCol = mix(inkWhite, mix(inkGrey, inkBlack, funnelT), funnelT.mul(0.85));
+    const maelCol = mix(inkWhite, mix(inkGrey, inkBlack, funnelT), funnelT.mul(0.75));
 
     const afterNeural = mix(planeCol, neuralCol, params.layer2Enabled);
     const afterSaw = mix(afterNeural, sawCol, params.layer3Enabled);

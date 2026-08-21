@@ -91,7 +91,8 @@ export function createLabPanel({
     layer4Depth: params.layer4Depth.value,
     layer4Turns: params.layer4Turns.value,
     layer4Spin: params.layer4Spin.value,
-    layer4Streak: params.layer4Streak.value
+    layer4Streak: params.layer4Streak.value,
+    layer4PathSpeed: params.layer4PathSpeed.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -159,6 +160,7 @@ export function createLabPanel({
   refreshers.push(rangeRow(layersGroup, 'turns', state, 'layer4Turns', 1, 10, 0.1, (v) => params.layer4Turns.value = v, () => params.layer4Turns.value));
   refreshers.push(rangeRow(layersGroup, 'spin', state, 'layer4Spin', 0, 4, 0.05, (v) => params.layer4Spin.value = v, () => params.layer4Spin.value));
   refreshers.push(rangeRow(layersGroup, 'streak', state, 'layer4Streak', 0, 0.6, 0.01, (v) => params.layer4Streak.value = v, () => params.layer4Streak.value));
+  refreshers.push(rangeRow(layersGroup, 'path speed', state, 'layer4PathSpeed', 0, 0.5, 0.01, (v) => params.layer4PathSpeed.value = v, () => params.layer4PathSpeed.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';

@@ -46,14 +46,15 @@ export function createParameters() {
     // Separación total en Z (más bajo = líneas más juntas)
     layer3Span: uniform(6.2),
 
-    // Capa 4 · torbellino / maelstrom (cola hacia −Z)
+    // Capa 4 · torbellino con camino (bucles) y cola hacia −Z
     layer4Enabled: uniform(0.0),
     layer4Spring: uniform(15.0),
-    layer4Radius: uniform(3.6),
+    layer4Radius: uniform(1.15),
     layer4Depth: uniform(7.5),
-    layer4Turns: uniform(5.5),
-    layer4Spin: uniform(1.35),
+    layer4Turns: uniform(4.5),
+    layer4Spin: uniform(2.1),
     layer4Pull: uniform(0.55),
-    layer4Streak: uniform(0.22)
+    layer4Streak: uniform(0.28),
+    layer4PathSpeed: uniform(0.12)
   };
 }
