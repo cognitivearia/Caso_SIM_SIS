@@ -44,6 +44,16 @@ export function createParameters() {
     layer3Frequency: uniform(0.55),
     layer3Speed: uniform(0.85),
     // Separación total en Z (más bajo = líneas más juntas)
-    layer3Span: uniform(6.2)
+    layer3Span: uniform(6.2),
+
+    // Capa 4 · torbellino / maelstrom (cola hacia −Z)
+    layer4Enabled: uniform(0.0),
+    layer4Spring: uniform(15.0),
+    layer4Radius: uniform(3.6),
+    layer4Depth: uniform(7.5),
+    layer4Turns: uniform(5.5),
+    layer4Spin: uniform(1.35),
+    layer4Pull: uniform(0.55),
+    layer4Streak: uniform(0.22)
   };
 }

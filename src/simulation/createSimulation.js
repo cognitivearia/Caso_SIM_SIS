@@ -279,9 +279,55 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
 
     const sawLinesTarget = vec3(along, sawY.add(0.15), lineZ.add(lineThick));
 
-    // Blend de capas (base → neuronas → sierra)
+    // --- CAPA 4: torbellino / maelstrom (cola hacia −Z) ---
+    const m1 = hash(i.add(uint(457)));
+    const m2 = hash(i.add(uint(509)));
+    const m3 = hash(i.add(uint(563)));
+    const m4 = hash(i.add(uint(617)));
+
+    // Boca del remolino (más cerca de cámara / +Z) → cola hacia −Z
+    const mouth = vec3(0.0, 1.65, 7.2);
+    // t=0 en el borde exterior brillante; t→1 en el abismo (−Z)
+    // Más partículas en el anillo exterior (densidad alta en el borde)
+    const tFunnel = m1.pow(1.65).clamp(0.02, 0.98);
+    const radius = params.layer4Radius
+      .mul(float(1.0).sub(tFunnel.pow(1.15)))
+      .mul(mix(0.92, 1.08, m2));
+    // Elipse de perspectiva
+    const ellipse = float(0.72);
+    const spiralTheta = m3.mul(6.28318530718)
+      .add(tFunnel.mul(params.layer4Turns).mul(6.28318530718))
+      .add(params.time.mul(params.layer4Spin));
+    // Descenso en −Z + ligera caída en Y (embudo)
+    const zPos = mouth.z.sub(tFunnel.mul(params.layer4Depth));
+    const yPos = mouth.y.sub(tFunnel.mul(params.layer4Depth.mul(0.22)));
+    const spiral = vec3(
+      mouth.x.add(cos(spiralTheta).mul(radius)),
+      yPos.add(sin(spiralTheta).mul(radius.mul(ellipse))),
+      zPos
+    );
+    // Estelas fragmentadas (trazos tangenciales, look grabado)
+    const tangent = vec3(
+      sin(spiralTheta).mul(-1.0),
+      cos(spiralTheta).mul(ellipse),
+      params.layer4Pull.mul(-0.35)
+    );
+    const tanN = tangent.div(max(tangent.length(), 0.05));
+    const streak = tanN.mul(params.layer4Streak)
+      .mul(mix(0.25, 1.4, m4))
+      .mul(mix(1.15, 0.35, tFunnel)); // trazos más largos afuera
+    // Jitter orgánico (no perfecto)
+    const jitter = vec3(
+      m1.sub(0.5),
+      m2.sub(0.5).mul(0.6),
+      m3.sub(0.5).mul(0.4)
+    ).mul(mix(0.08, 0.02, tFunnel));
+    const maelstromTarget = spiral.add(streak.mul(m4.sub(0.5).mul(2.0))).add(jitter);
+
+    // Blend de capas (base → neuronas → sierra → torbellino)
     target.assign(mix(baseTarget, neuralTarget, params.layer2Enabled));
     target.assign(mix(target, sawLinesTarget, params.layer3Enabled));
+    target.assign(mix(target, maelstromTarget, params.layer4Enabled));
 
     springK.assign(
       mix(
@@ -291,12 +337,14 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
       )
     );
     springK.assign(mix(springK, params.layer3Spring, params.layer3Enabled));
+    springK.assign(mix(springK, params.layer4Spring, params.layer4Enabled));
 
     force.addAssign(wobble.mul(params.layer2Enabled).mul(0.04));
     force.addAssign(wobble.mul(params.layer3Enabled).mul(0.03));
+    force.addAssign(wobble.mul(params.layer4Enabled).mul(0.05));
 
     force.addAssign(target.sub(p).mul(springK));
-    const layerDrag = max(params.layer2Enabled, params.layer3Enabled);
+    const layerDrag = max(params.layer2Enabled, max(params.layer3Enabled, params.layer4Enabled));
     const drag = params.dragCoefficient.mul(mix(1.0, 2.8, layerDrag));
     force.addAssign(v.mul(drag).mul(-1.0));
 
@@ -323,8 +371,12 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
     const neuralScale = mix(0.45, 1.55, hubGlow);
     const sawScale = mix(1.35, 0.5, params.layer3Density);
+    // Torbellino: puntos más grandes en el anillo exterior, finos hacia la cola (−Z)
+    const depthT = float(7.2).sub(pos.z).div(params.layer4Depth.add(0.01)).clamp(0.0, 1.0);
+    const maelScale = mix(1.15, 0.35, depthT);
     const layered = mix(1.0, neuralScale, params.layer2Enabled);
-    return params.particleSize.mul(mix(layered, sawScale, params.layer3Enabled));
+    const afterSaw = mix(layered, sawScale, params.layer3Enabled);
+    return params.particleSize.mul(mix(afterSaw, maelScale, params.layer4Enabled));
   })();
 
   material.colorNode = Fn(() => {
@@ -352,9 +404,17 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const sawWarm = color('#e8f0ff');
     const sawCol = mix(sawCold, sawWarm, heightT);
 
+    // Blanco/crema → negro hacia la cola (look grabado)
+    const funnelT = float(7.2).sub(pos.z).div(params.layer4Depth.add(0.01)).clamp(0.0, 1.0);
+    const inkWhite = color('#f2f0ea');
+    const inkGrey = color('#8a8680');
+    const inkBlack = color('#0a0a0a');
+    const maelCol = mix(inkWhite, mix(inkGrey, inkBlack, funnelT), funnelT.mul(0.85));
+
     const afterNeural = mix(planeCol, neuralCol, params.layer2Enabled);
-    const base = mix(afterNeural, sawCol, params.layer3Enabled);
-    return vec4(mix(base, hot, speedT.mul(0.2)), 1.0);
+    const afterSaw = mix(afterNeural, sawCol, params.layer3Enabled);
+    const base = mix(afterSaw, maelCol, params.layer4Enabled);
+    return vec4(mix(base, hot, speedT.mul(0.15).mul(float(1.0).sub(params.layer4Enabled))), 1.0);
   })();
 
   material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);

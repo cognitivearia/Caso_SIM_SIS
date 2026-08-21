@@ -74,7 +74,8 @@ async function main() {
   const layers = {
     cornerVortices: { on: false },
     neuralNet: { on: false },
-    sawLines: { on: false }
+    sawLines: { on: false },
+    maelstrom: { on: false }
   };
 
   const perfChaos = createPerfChaosSlider(params);
@@ -83,10 +84,11 @@ async function main() {
     const l1 = layers.cornerVortices.on ? 'ON' : 'off';
     const l2 = layers.neuralNet.on ? 'ON' : 'off';
     const l3 = layers.sawLines.on ? 'ON' : 'off';
+    const l4 = layers.maelstrom.on ? 'ON' : 'off';
     if (mode === 'LAB') {
-      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: vórtices [${l1}] · 2: neuronas [${l2}] · 3: sierra [${l3}]`;
+      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset<br>1: vórtices [${l1}] · 2: neuronas [${l2}] · 3: sierra [${l3}] · 4: torbellino [${l4}]`;
     } else {
-      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1 [${l1}] · 2 [${l2}] · 3 [${l3}]`;
+      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1 [${l1}] · 2 [${l2}] · 3 [${l3}] · 4 [${l4}]`;
     }
   };
 
@@ -111,9 +113,17 @@ async function main() {
     updateHud();
   };
 
+  const setLayer4 = (on) => {
+    layers.maelstrom.on = on;
+    params.layer4Enabled.value = on ? 1 : 0;
+    panel?.refresh();
+    updateHud();
+  };
+
   const toggleLayer1 = () => setLayer1(!layers.cornerVortices.on);
   const toggleLayer2 = () => setLayer2(!layers.neuralNet.on);
   const toggleLayer3 = () => setLayer3(!layers.sawLines.on);
+  const toggleLayer4 = () => setLayer4(!layers.maelstrom.on);
 
   const setMode = (next) => {
     mode = next;
@@ -128,6 +138,7 @@ async function main() {
     setLayer1(false);
     setLayer2(false);
     setLayer3(false);
+    setLayer4(false);
     elapsed = 0;
     params.time.value = 0;
     simulation.reset();
@@ -142,6 +153,7 @@ async function main() {
       if (id === 'cornerVortices') toggleLayer1();
       if (id === 'neuralNet') toggleLayer2();
       if (id === 'sawLines') toggleLayer3();
+      if (id === 'maelstrom') toggleLayer4();
     },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; },
@@ -160,6 +172,7 @@ async function main() {
     if (event.code === 'Digit1') toggleLayer1();
     if (event.code === 'Digit2') toggleLayer2();
     if (event.code === 'Digit3') toggleLayer3();
+    if (event.code === 'Digit4') toggleLayer4();
   });
 
   addEventListener('resize', () => {

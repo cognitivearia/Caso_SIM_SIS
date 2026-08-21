@@ -85,7 +85,13 @@ export function createLabPanel({
     layer3Amplitude: params.layer3Amplitude.value,
     layer3Frequency: params.layer3Frequency.value,
     layer3Speed: params.layer3Speed.value,
-    layer3Span: params.layer3Span.value
+    layer3Span: params.layer3Span.value,
+    layer4Spring: params.layer4Spring.value,
+    layer4Radius: params.layer4Radius.value,
+    layer4Depth: params.layer4Depth.value,
+    layer4Turns: params.layer4Turns.value,
+    layer4Spin: params.layer4Spin.value,
+    layer4Streak: params.layer4Streak.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
@@ -105,7 +111,8 @@ export function createLabPanel({
     const l1 = layers.cornerVortices.on ? 'ON' : 'off';
     const l2 = layers.neuralNet.on ? 'ON' : 'off';
     const l3 = layers.sawLines.on ? 'ON' : 'off';
-    layerStatus.textContent = `1 vórtices: ${l1} · 2 neuronas: ${l2} · 3 sierra: ${l3}`;
+    const l4 = layers.maelstrom.on ? 'ON' : 'off';
+    layerStatus.textContent = `1: ${l1} · 2: ${l2} · 3: ${l3} · 4 torbellino: ${l4}`;
   };
   refreshLayerStatus();
   layersGroup.append(layerStatus);
@@ -144,6 +151,14 @@ export function createLabPanel({
   refreshers.push(rangeRow(layersGroup, 'amplitude', state, 'layer3Amplitude', 0.05, 1.5, 0.05, (v) => params.layer3Amplitude.value = v, () => params.layer3Amplitude.value));
   refreshers.push(rangeRow(layersGroup, 'frequency', state, 'layer3Frequency', 0.1, 2, 0.05, (v) => params.layer3Frequency.value = v, () => params.layer3Frequency.value));
   refreshers.push(rangeRow(layersGroup, 'speed', state, 'layer3Speed', 0.1, 3, 0.05, (v) => params.layer3Speed.value = v, () => params.layer3Speed.value));
+
+  button(layersGroup, '4 · Torbellino (−Z)', () => onToggleLayer('maelstrom'));
+  refreshers.push(rangeRow(layersGroup, 'mael spring', state, 'layer4Spring', 4, 24, 0.1, (v) => params.layer4Spring.value = v, () => params.layer4Spring.value));
+  refreshers.push(rangeRow(layersGroup, 'radius', state, 'layer4Radius', 1.5, 6, 0.1, (v) => params.layer4Radius.value = v, () => params.layer4Radius.value));
+  refreshers.push(rangeRow(layersGroup, 'depth (−Z)', state, 'layer4Depth', 3, 14, 0.1, (v) => params.layer4Depth.value = v, () => params.layer4Depth.value));
+  refreshers.push(rangeRow(layersGroup, 'turns', state, 'layer4Turns', 1, 10, 0.1, (v) => params.layer4Turns.value = v, () => params.layer4Turns.value));
+  refreshers.push(rangeRow(layersGroup, 'spin', state, 'layer4Spin', 0, 4, 0.05, (v) => params.layer4Spin.value = v, () => params.layer4Spin.value));
+  refreshers.push(rangeRow(layersGroup, 'streak', state, 'layer4Streak', 0, 0.6, 0.01, (v) => params.layer4Streak.value = v, () => params.layer4Streak.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';
