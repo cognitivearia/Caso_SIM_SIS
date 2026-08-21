@@ -49,7 +49,7 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
   panel.className = 'panel';
   panel.innerHTML = `
     <h1>Horizon · Layer Forces</h1>
-    <p>Base: plano hacia el horizonte (olas/dunas). Los presets son <strong>capas</strong> on/off sobre esa base. Sin mouse.</p>
+    <p>Base: plano hacia el horizonte (olas/dunas). Los presets son <strong>capas</strong> on/off. Sin mouse.</p>
   `;
 
   const sim = document.createElement('div');
@@ -64,40 +64,34 @@ export function createLabPanel({ params, layers, onReset, onToggleLayer, onModeC
     waveSpeed: params.waveSpeed.value,
     planeSpring: params.planeSpring.value,
     layer1Attract: params.layer1Attract.value,
-    layer1OrbRadius: params.layer1OrbRadius.value,
-    layer1PulseAmp: params.layer1PulseAmp.value,
-    layer1PulseSpeed: params.layer1PulseSpeed.value
+    layer1Vortex: params.layer1Vortex.value
   };
 
   refreshers.push(rangeRow(sim, 'timeScale', state, 'timeScale', 0, 2, 0.01, (v) => params.timeScale.value = v, () => params.timeScale.value));
-  refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.005, 0.08, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
+  refreshers.push(rangeRow(sim, 'particleSize', state, 'particleSize', 0.004, 0.05, 0.001, (v) => params.particleSize.value = v, () => params.particleSize.value));
   refreshers.push(rangeRow(sim, 'waveAmp', state, 'waveAmp', 0, 0.8, 0.01, (v) => params.waveAmp.value = v, () => params.waveAmp.value));
   refreshers.push(rangeRow(sim, 'waveSpeed', state, 'waveSpeed', 0, 3, 0.05, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
   refreshers.push(rangeRow(sim, 'planeSpring', state, 'planeSpring', 1, 16, 0.1, (v) => params.planeSpring.value = v, () => params.planeSpring.value));
 
   const layersGroup = document.createElement('div');
   layersGroup.className = 'group';
-  layersGroup.innerHTML = '<h2>Capas (presets)</h2><p>1 activa/desactiva sobre el mismo plano. Formación → pulso automático.</p>';
+  layersGroup.innerHTML = '<h2>Capas (presets)</h2><p>1: dos vórtices de atracción (esquina superior-derecha e inferior-izquierda).</p>';
   panel.append(layersGroup);
 
   const layerStatus = document.createElement('p');
   layerStatus.style.margin = '6px 0 0';
   const refreshLayerStatus = () => {
-    const on = layers.orbSides.on;
-    const phase = layers.orbSides.phase;
-    layerStatus.textContent = on
-      ? `Capa 1: ON · fase ${phase === 'form' ? 'formación' : 'pulso lento'}`
+    layerStatus.textContent = layers.cornerVortices.on
+      ? 'Capa 1: ON · vórtices TR + BL'
       : 'Capa 1: OFF';
   };
   refreshLayerStatus();
   layersGroup.append(layerStatus);
   refreshers.push({ refresh: refreshLayerStatus });
 
-  button(layersGroup, '1 · Orbes laterales (toggle)', () => onToggleLayer('orbSides'));
-  refreshers.push(rangeRow(layersGroup, 'attract', state, 'layer1Attract', 1, 16, 0.1, (v) => params.layer1Attract.value = v, () => params.layer1Attract.value));
-  refreshers.push(rangeRow(layersGroup, 'orbRadius', state, 'layer1OrbRadius', 0.2, 1.4, 0.05, (v) => params.layer1OrbRadius.value = v, () => params.layer1OrbRadius.value));
-  refreshers.push(rangeRow(layersGroup, 'pulseAmp', state, 'layer1PulseAmp', 0, 0.6, 0.01, (v) => params.layer1PulseAmp.value = v, () => params.layer1PulseAmp.value));
-  refreshers.push(rangeRow(layersGroup, 'pulseSpeed', state, 'layer1PulseSpeed', 0.2, 4, 0.05, (v) => params.layer1PulseSpeed.value = v, () => params.layer1PulseSpeed.value));
+  button(layersGroup, '1 · Vórtices esquinas (toggle)', () => onToggleLayer('cornerVortices'));
+  refreshers.push(rangeRow(layersGroup, 'attract', state, 'layer1Attract', 0, 14, 0.1, (v) => params.layer1Attract.value = v, () => params.layer1Attract.value));
+  refreshers.push(rangeRow(layersGroup, 'vortex spin', state, 'layer1Vortex', 0, 10, 0.1, (v) => params.layer1Vortex.value = v, () => params.layer1Vortex.value));
 
   const actions = document.createElement('div');
   actions.className = 'group';

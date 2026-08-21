@@ -7,8 +7,7 @@ import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createLabPanel } from './ui/labPanel.js';
 
-const PARTICLE_COUNT = 131072;
-const LAYER1_FORMATION_SECONDS = 3.2;
+const PARTICLE_COUNT = 524288; // 2^19 — más densidad, partículas más pequeñas
 
 async function main() {
   const mount = document.querySelector('#app');
@@ -21,7 +20,6 @@ async function main() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#07080a');
 
-  // Cámara elevada mirando el plano hacia el horizonte
   const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 80);
   camera.position.set(0, 5.2, 9.5);
 
@@ -46,52 +44,27 @@ async function main() {
   let elapsed = 0;
   let panel;
 
-  // Capas: on/off sobre la misma base (sin reiniciar el plano al togglear)
   const layers = {
-    orbSides: {
-      on: false,
-      activatedAt: -999,
-      phase: 'off' // off | form | pulse
-    }
+    cornerVortices: { on: false }
   };
 
   const updateHud = () => {
-    const l1 = !layers.orbSides.on
-      ? 'off'
-      : (layers.orbSides.phase === 'form' ? 'formando' : 'pulso');
+    const l1 = layers.cornerVortices.on ? 'ON' : 'off';
     if (mode === 'LAB') {
-      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset plano<br>1: capa orbes laterales [${l1}] · capas on/off`;
+      hud.innerHTML = `<strong>LAB</strong> · P: performance · R: reset plano<br>1: vórtices esquinas [${l1}] · capas on/off`;
     } else {
-      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: orbes [${l1}]`;
+      hud.innerHTML = `<strong>PERFORMANCE</strong> · 1: vórtices [${l1}]`;
     }
   };
 
   const setLayer1 = (on) => {
-    layers.orbSides.on = on;
+    layers.cornerVortices.on = on;
     params.layer1Enabled.value = on ? 1 : 0;
-    if (on) {
-      layers.orbSides.activatedAt = elapsed;
-      layers.orbSides.phase = 'form';
-      params.layer1Mode.value = 0; // formación
-    } else {
-      layers.orbSides.phase = 'off';
-      params.layer1Mode.value = 0;
-    }
     panel?.refresh();
     updateHud();
   };
 
-  const toggleLayer1 = () => setLayer1(!layers.orbSides.on);
-
-  const syncLayer1Phase = () => {
-    if (!layers.orbSides.on) return;
-    const age = elapsed - layers.orbSides.activatedAt;
-    if (layers.orbSides.phase === 'form' && age >= LAYER1_FORMATION_SECONDS) {
-      layers.orbSides.phase = 'pulse';
-      params.layer1Mode.value = 1; // deja de atraer del suelo; empieza pulso
-      updateHud();
-    }
-  };
+  const toggleLayer1 = () => setLayer1(!layers.cornerVortices.on);
 
   const setMode = (next) => {
     mode = next;
@@ -112,7 +85,7 @@ async function main() {
     layers,
     onReset: hardReset,
     onToggleLayer: (id) => {
-      if (id === 'orbSides') toggleLayer1();
+      if (id === 'cornerVortices') toggleLayer1();
     },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; }
@@ -142,7 +115,6 @@ async function main() {
     if (!paused) {
       elapsed += params.dt.value * params.timeScale.value;
       params.time.value = elapsed;
-      syncLayer1Phase();
       simulation.stepSimulation();
     }
     orbit.update();

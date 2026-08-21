@@ -2,14 +2,13 @@ import * as THREE from 'three/webgpu';
 import {
   Fn,
   If,
-  abs,
   color,
-  cos,
   float,
   hash,
   instanceIndex,
   instancedArray,
   max,
+  min,
   mix,
   sin,
   step,
@@ -19,10 +18,21 @@ import {
   vec4
 } from 'three/tsl';
 
-export function createSimulation({ renderer, scene, params, count = 131072 }) {
+function vortexForce(p, center, attract, swirl, softening) {
+  const toCenter = center.sub(p);
+  const dist = max(toCenter.length(), softening);
+  const radial = toCenter.div(dist);
+  // Atracción hacia el centro del vórtice
+  const pull = radial.mul(attract).div(dist.add(0.25));
+  // Giro tangencial alrededor del eje de visión aproximado (Z)
+  const tangent = vec3(0.0, 0.0, 1.0).cross(radial);
+  const spin = tangent.mul(swirl).div(dist.add(0.4));
+  return pull.add(spin);
+}
+
+export function createSimulation({ renderer, scene, params, count = 262144 }) {
   const positionBuffer = instancedArray(count, 'vec3');
   const velocityBuffer = instancedArray(count, 'vec3');
-  // Posición de reposo en el plano (para resultados predecibles y retorno al desactivar capas)
   const homeBuffer = instancedArray(count, 'vec3');
 
   const initParticles = Fn(() => {
@@ -35,7 +45,6 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const r2 = hash(i.add(uint(23)));
     const r3 = hash(i.add(uint(37)));
 
-    // Plano hacia el horizonte: X ancho, Z profundidad, Y casi 0
     const x = r1.sub(0.5).mul(12.0);
     const z = r2.mul(14.0).sub(2.0);
     const y = r3.sub(0.5).mul(0.04);
@@ -53,7 +62,7 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
     const dt = params.dt.mul(params.timeScale);
     const force = vec3(0.0).toVar();
 
-    // --- BASE: plano que pulsa como olas / dunas ---
+    // --- BASE: plano que ondula ---
     const wave =
       sin(home.x.mul(params.waveFreqX).add(params.time.mul(params.waveSpeed)))
         .mul(params.waveAmp)
@@ -66,53 +75,35 @@ export function createSimulation({ renderer, scene, params, count = 131072 }) {
             .mul(params.waveAmp.mul(0.35))
         );
 
-    const baseTarget = vec3(home.x, home.y.add(wave), home.z).toVar();
-    const target = baseTarget.toVar();
+    const baseTarget = vec3(home.x, home.y.add(wave), home.z);
     const springK = params.planeSpring.toVar();
 
-    // --- CAPA 1: orbes laterales ---
+    // --- CAPA 1: dos vórtices de atracción (esquinas) ---
     If(params.layer1Enabled.greaterThan(0.5), () => {
-      const toLeft = params.orbLeft.sub(p);
-      const toRight = params.orbRight.sub(p);
-      const distL = max(toLeft.length(), 0.05);
-      const distR = max(toRight.length(), 0.05);
-      const side = step(0.0, home.x); // 0 izquierda, 1 derecha
-      const isLateral = step(params.layer1LateralBand, abs(home.x));
+      const fTR = vortexForce(
+        p,
+        params.vortexTR,
+        params.layer1Attract,
+        params.layer1Vortex,
+        params.layer1Softening
+      );
+      const fBL = vortexForce(
+        p,
+        params.vortexBL,
+        params.layer1Attract,
+        params.layer1Vortex,
+        params.layer1Softening
+      );
+      force.addAssign(fTR.add(fBL));
 
-      // Modo formación: atrae partículas laterales (y un poco del borde del suelo)
-      If(params.layer1Mode.lessThan(0.5), () => {
-        const edgeSoft = max(abs(home.x).sub(params.layer1LateralBand.mul(0.55)), 0.0).mul(0.25);
-        const gatherMask = isLateral.add(edgeSoft).clamp(0.0, 1.0);
-        const dirL = toLeft.div(distL);
-        const dirR = toRight.div(distR);
-        const attractL = dirL.mul(params.layer1Attract).div(distL.add(0.35)).mul(float(1.0).sub(side)).mul(gatherMask);
-        const attractR = dirR.mul(params.layer1Attract).div(distR.add(0.35)).mul(side).mul(gatherMask);
-        force.addAssign(attractL.add(attractR));
-        // Mientras se forman, suaviza el anclaje al plano en laterales
-        springK.assign(params.planeSpring.mul(float(1.0).sub(gatherMask.mul(0.85))));
-      });
-
-      // Modo pulso: ya no atrae del suelo; solo partículas cerca del orbe pulsan
-      If(params.layer1Mode.greaterThan(0.5), () => {
-        const nearest = mix(params.orbLeft, params.orbRight, side);
-        const toOrb = nearest.sub(p);
-        const dist = max(toOrb.length(), 0.02);
-        const inOrb = step(dist, params.layer1OrbRadius.mul(2.4));
-
-        const pulse = sin(params.time.mul(params.layer1PulseSpeed)).mul(params.layer1PulseAmp);
-        const radius = params.layer1OrbRadius.mul(float(1.0).add(pulse));
-
-        // Dirección estable desde home lateral → centro del orbe (predecible)
-        const fromHome = nearest.sub(vec3(home.x, nearest.y, home.z));
-        const shellDir = fromHome.normalize();
-        const shellTarget = nearest.add(shellDir.mul(radius));
-
-        target.assign(mix(baseTarget, shellTarget, inOrb));
-        springK.assign(mix(params.planeSpring, params.planeSpring.mul(2.2), inOrb));
-      });
+      // Cerca de un vórtice, afloja el anclaje al plano para que el remolino se lea
+      const dTR = max(params.vortexTR.sub(p).length(), 0.01);
+      const dBL = max(params.vortexBL.sub(p).length(), 0.01);
+      const near = float(1.0).sub(min(dTR, dBL).div(4.5).clamp(0.0, 1.0));
+      springK.assign(params.planeSpring.mul(float(1.0).sub(near.mul(0.9))));
     });
 
-    force.addAssign(target.sub(p).mul(springK));
+    force.addAssign(baseTarget.sub(p).mul(springK));
     force.addAssign(v.mul(params.dragCoefficient).mul(-1.0));
 
     v.addAssign(force.mul(dt));
