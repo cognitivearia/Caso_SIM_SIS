@@ -27,11 +27,12 @@ export function createParameters() {
     vortexTR: uniform(new THREE.Vector3(5.4, 0.65, 0.2)),
     vortexBL: uniform(new THREE.Vector3(-5.4, 0.45, 9.0)),
 
-    // Capa 2 · redes neuronales
+    // Capa 2 · redes neuronales (filamentos definidos)
     layer2Enabled: uniform(0.0),
-    layer2Spring: uniform(7.2),
-    layer2Pulse: uniform(0.08),
-    layer2BranchLen: uniform(3.4),
-    layer2Organic: uniform(1.15)
+    layer2Spring: uniform(16.0),
+    layer2Pulse: uniform(0.05),
+    layer2BranchLen: uniform(3.8),
+    layer2Organic: uniform(0.55),
+    layer2Thickness: uniform(0.09)
   };
 }
