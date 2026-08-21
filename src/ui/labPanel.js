@@ -51,6 +51,7 @@ export function createLabPanel({
   onModeChange,
   onPauseChange,
   onChaosChange,
+  onGlitchChange,
   onAmbientChange
 }) {
   const refreshers = [];
@@ -127,7 +128,10 @@ export function createLabPanel({
     onAmbientChange?.();
   }, () => params.ambientIntensity.value));
   refreshers.push(rangeRow(lookGroup, 'ambient wash', state, 'ambientMix', 0, 0.55, 0.01, (v) => params.ambientMix.value = v, () => params.ambientMix.value));
-  refreshers.push(rangeRow(lookGroup, 'glitch', state, 'glitchAmount', 0, 1, 0.01, (v) => params.glitchAmount.value = v, () => params.glitchAmount.value));
+  refreshers.push(rangeRow(lookGroup, 'glitch', state, 'glitchAmount', 0, 1, 0.01, (v) => {
+    params.glitchAmount.value = v;
+    onGlitchChange?.();
+  }, () => params.glitchAmount.value));
 
   const layersGroup = document.createElement('div');
   layersGroup.className = 'group';

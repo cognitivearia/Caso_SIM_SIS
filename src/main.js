@@ -11,18 +11,18 @@ import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 524288;
 
-function createPerfChaosSlider(params) {
+function createPerfGlitchSlider(params) {
   const wrap = document.createElement('div');
-  wrap.className = 'perf-chaos hidden';
+  wrap.className = 'perf-glitch hidden';
   const input = document.createElement('input');
   input.type = 'range';
   input.min = '0';
-  input.max = '6';
-  input.step = '0.1';
-  input.value = String(params.layer1Chaos.value);
-  input.setAttribute('aria-label', 'caos');
+  input.max = '1';
+  input.step = '0.01';
+  input.value = String(params.glitchAmount.value);
+  input.setAttribute('aria-label', 'glitch');
   input.addEventListener('input', () => {
-    params.layer1Chaos.value = Number(input.value);
+    params.glitchAmount.value = Number(input.value);
   });
   wrap.append(input);
   document.body.append(wrap);
@@ -32,7 +32,7 @@ function createPerfChaosSlider(params) {
       wrap.classList.toggle('hidden', !visible);
     },
     sync() {
-      input.value = String(params.layer1Chaos.value);
+      input.value = String(params.glitchAmount.value);
     }
   };
 }
@@ -83,7 +83,7 @@ async function main() {
     maelstrom: { on: false }
   };
 
-  const perfChaos = createPerfChaosSlider(params);
+  const perfGlitch = createPerfGlitchSlider(params);
 
   const updateHud = () => {
     const l1 = layers.cornerVortices.on ? 'ON' : 'off';
@@ -134,8 +134,8 @@ async function main() {
     mode = next;
     const lab = mode === 'LAB';
     panel.setVisible(lab);
-    perfChaos.setVisible(!lab);
-    if (!lab) perfChaos.sync();
+    perfGlitch.setVisible(!lab);
+    if (!lab) perfGlitch.sync();
     updateHud();
   };
 
@@ -162,7 +162,7 @@ async function main() {
     },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; },
-    onChaosChange: () => perfChaos.sync(),
+    onGlitchChange: () => perfGlitch.sync(),
     onAmbientChange: () => ambient.syncIntensity()
   });
 

@@ -28,11 +28,11 @@ export function createParameters() {
     bloomThreshold: uniform(0.45),
 
     // Ambiente lejano · morado arriba / azul abajo
-    ambientIntensity: uniform(1.25),
-    ambientMix: uniform(0.28),
+    ambientIntensity: uniform(1.35),
+    ambientMix: uniform(0.22),
 
     // Glitch (0 = limpio · 1 = fuerte)
-    glitchAmount: uniform(0.45),
+    glitchAmount: uniform(0.35),
 
     // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),
