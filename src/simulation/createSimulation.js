@@ -603,8 +603,16 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
 
     // Destello de velocidad (ámbar compartido) + boost para que el bloom lo recoja
     const lit = mix(base, amber, speedT.mul(0.22));
+
+    // Lavado ambiental lejano: morado arriba · azul abajo (según altura de la partícula)
+    const ambT = smoothstep(float(-0.4), float(3.2), pos.y);
+    const ambPurple = color('#9b6bdb');
+    const ambBlue = color('#3a6fd8');
+    const ambWash = mix(ambBlue, ambPurple, ambT).mul(params.ambientMix).mul(params.ambientIntensity);
+    const litAmb = lit.add(ambWash);
+
     const bloomBoost = float(1.0).add(speedT.mul(0.55));
-    return vec4(lit.mul(bloomBoost), 1.0);
+    return vec4(litAmb.mul(bloomBoost), 1.0);
   })();
 
   // Glow suave (no círculo duro): cae en gaussiana → halo de luz

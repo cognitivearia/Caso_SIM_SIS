@@ -50,7 +50,8 @@ export function createLabPanel({
   onToggleLayer,
   onModeChange,
   onPauseChange,
-  onChaosChange
+  onChaosChange,
+  onAmbientChange
 }) {
   const refreshers = [];
   const panel = document.createElement('aside');
@@ -77,6 +78,8 @@ export function createLabPanel({
     bloomStrength: params.bloomStrength.value,
     bloomRadius: params.bloomRadius.value,
     bloomThreshold: params.bloomThreshold.value,
+    ambientIntensity: params.ambientIntensity.value,
+    ambientMix: params.ambientMix.value,
     layer1Attract: params.layer1Attract.value,
     layer1Vortex: params.layer1Vortex.value,
     layer1Flow: params.layer1Flow.value,
@@ -118,6 +121,11 @@ export function createLabPanel({
   refreshers.push(rangeRow(lookGroup, 'bloom', state, 'bloomStrength', 0, 1.5, 0.05, (v) => params.bloomStrength.value = v, () => params.bloomStrength.value));
   refreshers.push(rangeRow(lookGroup, 'bloom radius', state, 'bloomRadius', 0, 1, 0.05, (v) => params.bloomRadius.value = v, () => params.bloomRadius.value));
   refreshers.push(rangeRow(lookGroup, 'bloom threshold', state, 'bloomThreshold', 0, 1, 0.05, (v) => params.bloomThreshold.value = v, () => params.bloomThreshold.value));
+  refreshers.push(rangeRow(lookGroup, 'ambient', state, 'ambientIntensity', 0, 1.5, 0.05, (v) => {
+    params.ambientIntensity.value = v;
+    onAmbientChange?.();
+  }, () => params.ambientIntensity.value));
+  refreshers.push(rangeRow(lookGroup, 'ambient wash', state, 'ambientMix', 0, 0.4, 0.01, (v) => params.ambientMix.value = v, () => params.ambientMix.value));
 
   const layersGroup = document.createElement('div');
   layersGroup.className = 'group';

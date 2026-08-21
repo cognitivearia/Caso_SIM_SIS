@@ -6,6 +6,7 @@ import './styles.css';
 import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
 import { createPostFx } from './post/createPostFx.js';
+import { createAmbientEnvironment } from './environment/createAmbientEnvironment.js';
 import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 524288;
@@ -45,7 +46,6 @@ async function main() {
   }
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#04060a');
 
   const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 80);
   camera.position.set(0, 5.2, 9.5);
@@ -66,6 +66,7 @@ async function main() {
   orbit.maxDistance = 18;
 
   const params = createParameters();
+  const ambient = createAmbientEnvironment(scene, params);
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
   const postFx = createPostFx({ renderer, scene, camera, params });
 
@@ -161,7 +162,8 @@ async function main() {
     },
     onModeChange: () => setMode(mode === 'LAB' ? 'PERFORMANCE' : 'LAB'),
     onPauseChange: () => { paused = !paused; },
-    onChaosChange: () => perfChaos.sync()
+    onChaosChange: () => perfChaos.sync(),
+    onAmbientChange: () => ambient.syncIntensity()
   });
 
   const hud = document.createElement('div');

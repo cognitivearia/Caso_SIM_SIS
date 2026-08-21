@@ -27,6 +27,10 @@ export function createParameters() {
     bloomRadius: uniform(0.55),
     bloomThreshold: uniform(0.22),
 
+    // Ambiente lejano · morado arriba / azul abajo
+    ambientIntensity: uniform(0.85),
+    ambientMix: uniform(0.14),
+
     // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),
     layer1Attract: uniform(8.5),
