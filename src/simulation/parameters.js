@@ -17,24 +17,24 @@ export function createParameters() {
     waveSpeed: uniform(1.35),
     dragCoefficient: uniform(0.22),
     // Qué tanto se deforman unas capas con otras (0 = solo coexisten, 1 = cruce fuerte)
-    layerCrossTalk: uniform(0.65),
+    layerCrossTalk: uniform(0.4),
 
     // Look · estelas / bloom / glow
-    trailStretch: uniform(2.8),
-    trailDamp: uniform(0.9),
-    glowFalloff: uniform(7.5),
-    bloomStrength: uniform(0.18),
-    bloomRadius: uniform(0.35),
-    bloomThreshold: uniform(0.45),
+    trailStretch: uniform(2.3),
+    trailDamp: uniform(0.78),
+    glowFalloff: uniform(13.2),
+    bloomStrength: uniform(0.1),
+    bloomRadius: uniform(0.65),
+    bloomThreshold: uniform(0.75),
 
     // Ambiente · dos soles lejanos (solo luz; colores editables)
-    ambientIntensity: uniform(0.75),
-    ambientMix: uniform(0.1),
-    sunBackColor: uniform(new THREE.Color('#a78bfa')),
-    sunFrontColor: uniform(new THREE.Color('#60a5fa')),
+    ambientIntensity: uniform(0.15),
+    ambientMix: uniform(0.0),
+    sunBackColor: uniform(new THREE.Color('#6c0077')),
+    sunFrontColor: uniform(new THREE.Color('#550010')),
 
     // Glitch (0 = limpio · 1 = fuerte)
-    glitchAmount: uniform(0.35),
+    glitchAmount: uniform(0.0),
 
     // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),
@@ -48,27 +48,27 @@ export function createParameters() {
 
     // Capa 2 · redes neuronales (filamentos definidos)
     layer2Enabled: uniform(0.0),
-    layer2Spring: uniform(16.0),
-    layer2Pulse: uniform(0.05),
-    layer2BranchLen: uniform(3.8),
-    layer2Organic: uniform(0.55),
-    layer2Thickness: uniform(0.09),
+    layer2Spring: uniform(9.3),
+    layer2Pulse: uniform(0.0),
+    layer2BranchLen: uniform(2.25),
+    layer2Organic: uniform(1.25),
+    layer2Thickness: uniform(0.11),
 
     // Capa 3 · líneas paralelas con onda de sierra armónica
     layer3Enabled: uniform(0.0),
     layer3Spring: uniform(14.0),
     // 0 = pocas líneas gruesas · 1 = muchas líneas delgadas
-    layer3Density: uniform(0.45),
-    layer3Amplitude: uniform(0.55),
-    layer3Frequency: uniform(0.55),
-    layer3Speed: uniform(0.85),
+    layer3Density: uniform(0.18),
+    layer3Amplitude: uniform(1.1),
+    layer3Frequency: uniform(1.2),
+    layer3Speed: uniform(2.6),
     // Separación total en Z (más bajo = líneas más juntas)
-    layer3Span: uniform(6.2),
+    layer3Span: uniform(12.0),
 
     // Capa 4 · torbellino con camino (bucles) y cola hacia −Z
     layer4Enabled: uniform(0.0),
     layer4Spring: uniform(15.0),
-    layer4Radius: uniform(1.15),
+    layer4Radius: uniform(1.5),
     layer4Depth: uniform(7.5),
     layer4Turns: uniform(4.5),
     layer4Spin: uniform(2.1),
