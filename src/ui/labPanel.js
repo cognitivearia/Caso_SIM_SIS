@@ -57,7 +57,7 @@ export function createLabPanel({
   panel.className = 'panel';
   panel.innerHTML = `
     <h1>Horizon · Layer Forces</h1>
-    <p>Base: plano olas/dunas. Capas on/off; al combinarlas se deforman entre sí (cross-talk).</p>
+    <p>Base: plano olas/dunas. Capas on/off con cross-talk. Look: estelas + bloom.</p>
   `;
 
   const sim = document.createElement('div');
@@ -71,6 +71,12 @@ export function createLabPanel({
     waveAmp: params.waveAmp.value,
     waveSpeed: params.waveSpeed.value,
     planeSpring: params.planeSpring.value,
+    trailStretch: params.trailStretch.value,
+    trailDamp: params.trailDamp.value,
+    glowFalloff: params.glowFalloff.value,
+    bloomStrength: params.bloomStrength.value,
+    bloomRadius: params.bloomRadius.value,
+    bloomThreshold: params.bloomThreshold.value,
     layer1Attract: params.layer1Attract.value,
     layer1Vortex: params.layer1Vortex.value,
     layer1Flow: params.layer1Flow.value,
@@ -101,6 +107,17 @@ export function createLabPanel({
   refreshers.push(rangeRow(sim, 'waveAmp', state, 'waveAmp', 0, 0.8, 0.01, (v) => params.waveAmp.value = v, () => params.waveAmp.value));
   refreshers.push(rangeRow(sim, 'waveSpeed', state, 'waveSpeed', 0, 3, 0.05, (v) => params.waveSpeed.value = v, () => params.waveSpeed.value));
   refreshers.push(rangeRow(sim, 'planeSpring', state, 'planeSpring', 1, 16, 0.1, (v) => params.planeSpring.value = v, () => params.planeSpring.value));
+
+  const lookGroup = document.createElement('div');
+  lookGroup.className = 'group';
+  lookGroup.innerHTML = '<h2>Look · luz</h2>';
+  panel.append(lookGroup);
+  refreshers.push(rangeRow(lookGroup, 'trail stretch', state, 'trailStretch', 1, 5, 0.05, (v) => params.trailStretch.value = v, () => params.trailStretch.value));
+  refreshers.push(rangeRow(lookGroup, 'trail persist', state, 'trailDamp', 0.7, 0.98, 0.01, (v) => params.trailDamp.value = v, () => params.trailDamp.value));
+  refreshers.push(rangeRow(lookGroup, 'glow soft', state, 'glowFalloff', 3, 14, 0.1, (v) => params.glowFalloff.value = v, () => params.glowFalloff.value));
+  refreshers.push(rangeRow(lookGroup, 'bloom', state, 'bloomStrength', 0, 1.5, 0.05, (v) => params.bloomStrength.value = v, () => params.bloomStrength.value));
+  refreshers.push(rangeRow(lookGroup, 'bloom radius', state, 'bloomRadius', 0, 1, 0.05, (v) => params.bloomRadius.value = v, () => params.bloomRadius.value));
+  refreshers.push(rangeRow(lookGroup, 'bloom threshold', state, 'bloomThreshold', 0, 1, 0.05, (v) => params.bloomThreshold.value = v, () => params.bloomThreshold.value));
 
   const layersGroup = document.createElement('div');
   layersGroup.className = 'group';

@@ -7,7 +7,7 @@ export function createParameters() {
     timeScale: uniform(1.0),
     time: uniform(0.0),
     maxSpeed: uniform(9.0),
-    particleSize: uniform(0.012),
+    particleSize: uniform(0.018),
 
     // Plano base (dunas / olas)
     planeSpring: uniform(5.5),
@@ -18,6 +18,14 @@ export function createParameters() {
     dragCoefficient: uniform(0.22),
     // Qué tanto se deforman unas capas con otras (0 = solo coexisten, 1 = cruce fuerte)
     layerCrossTalk: uniform(0.65),
+
+    // Look · estelas / bloom / glow
+    trailStretch: uniform(2.8),
+    trailDamp: uniform(0.9),
+    glowFalloff: uniform(7.5),
+    bloomStrength: uniform(0.45),
+    bloomRadius: uniform(0.55),
+    bloomThreshold: uniform(0.22),
 
     // Capa 1 · vórtices
     layer1Enabled: uniform(0.0),

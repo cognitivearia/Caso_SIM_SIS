@@ -5,6 +5,7 @@ import './styles.css';
 
 import { createParameters } from './simulation/parameters.js';
 import { createSimulation } from './simulation/createSimulation.js';
+import { createPostFx } from './post/createPostFx.js';
 import { createLabPanel } from './ui/labPanel.js';
 
 const PARTICLE_COUNT = 524288;
@@ -44,7 +45,7 @@ async function main() {
   }
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#07080a');
+  scene.background = new THREE.Color('#04060a');
 
   const camera = new THREE.PerspectiveCamera(42, innerWidth / innerHeight, 0.1, 80);
   camera.position.set(0, 5.2, 9.5);
@@ -52,6 +53,8 @@ async function main() {
   const renderer = new THREE.WebGPURenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.setSize(innerWidth, innerHeight);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
   mount.appendChild(renderer.domElement);
   await renderer.init();
 
@@ -64,6 +67,7 @@ async function main() {
 
   const params = createParameters();
   const simulation = createSimulation({ renderer, scene, params, count: PARTICLE_COUNT });
+  const postFx = createPostFx({ renderer, scene, camera, params });
 
   let paused = false;
   let mode = 'LAB';
@@ -195,7 +199,7 @@ async function main() {
       }
     }
     orbit.update();
-    renderer.render(scene, camera);
+    postFx.render();
   });
 }
 

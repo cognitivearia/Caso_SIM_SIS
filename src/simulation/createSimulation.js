@@ -3,8 +3,11 @@ import {
   Fn,
   If,
   abs,
+  atan,
+  cameraViewMatrix,
   color,
   cos,
+  exp,
   float,
   floor,
   fract,
@@ -21,6 +24,7 @@ import {
   step,
   uint,
   uv,
+  vec2,
   vec3,
   vec4
 } from 'three/tsl';
@@ -524,9 +528,13 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
   });
 
   material.positionNode = positionBuffer.toAttribute();
-  // Cerca de hubs (altura media-alta) un poco más grandes → somas legibles
+
+  // Tamaño base + estela: se alarga con la velocidad (look de trazo de luz)
   material.scaleNode = Fn(() => {
     const pos = positionBuffer.toAttribute();
+    const vel = velocityBuffer.toAttribute();
+    const speedT = vel.length().div(params.maxSpeed).clamp(0.0, 1.0);
+
     const hubGlow = smoothstep(float(1.0), float(2.6), pos.y);
     const neuralScale = mix(0.45, 1.55, hubGlow);
     const sawScale = mix(1.35, 0.5, params.layer3Density);
@@ -536,9 +544,21 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const e4s = params.layer4Enabled;
     const sSum = max(e2s.add(e3s).add(e4s), 0.001);
     const structScale = neuralScale.mul(e2s).add(sawScale.mul(e3s)).add(maelScale.mul(e4s)).div(sSum);
-    return params.particleSize.mul(mix(float(1.0), structScale, min(e2s.add(e3s).add(e4s), float(1.0))));
+    const size = params.particleSize.mul(mix(float(1.0), structScale, min(e2s.add(e3s).add(e4s), float(1.0))));
+
+    const stretch = mix(float(1.0), params.trailStretch, speedT.mul(speedT));
+    const thin = mix(float(1.0), float(0.42), speedT);
+    return vec2(size.mul(stretch), size.mul(thin));
   })();
 
+  // Orientar la estela en espacio de vista (dirección del movimiento en pantalla)
+  material.rotationNode = Fn(() => {
+    const vel = velocityBuffer.toAttribute();
+    const viewVel = cameraViewMatrix.mul(vec4(vel, 0.0)).xy;
+    return atan(viewVel.y, viewVel.x);
+  })();
+
+  // Paleta armónica compartida: ámbar cálido + teal fresco + marfil + tinta
   material.colorNode = Fn(() => {
     const pos = positionBuffer.toAttribute();
     const speed = velocityBuffer.toAttribute().length();
@@ -546,30 +566,33 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const speedT = speed.div(params.maxSpeed).clamp(0.0, 1.0);
     const depthT = pos.z.div(8.0).clamp(0.0, 1.0);
 
-    const dune = color('#c4a574');
-    const foam = color('#8ec8ff');
-    const hot = color('#ffb35a');
+    const amber = color('#e6a46c');
+    const teal = color('#6eb8c4');
+    const ivory = color('#f2ebe0');
+    const ink = color('#0c1016');
+
+    // Base · dunas cálidas → espuma teal
+    const dune = color('#c9a078');
+    const foam = mix(teal, ivory, 0.35);
     const planeCol = mix(dune, foam, heightT);
 
-    const deep = color('#2a1e28');
-    const axon = color('#6e4e5c');
-    const flesh = color('#8a6a58');
-    const node = color('#f3ebcf');
-    const glow = color('#ffe6a0');
-    const neuralBase = mix(deep, mix(axon, flesh, heightT), float(1.0).sub(depthT.mul(0.35)));
+    // Neuronas · cobre / rosa-tierra → marfil en somas (misma familia cálida)
+    const deep = color('#2a2220');
+    const axon = color('#7a5a52');
+    const flesh = color('#a87862');
+    const neuralBase = mix(deep, mix(axon, flesh, heightT), float(1.0).sub(depthT.mul(0.3)));
     const nearHub = smoothstep(float(1.15), float(2.85), pos.y);
-    const neuralCol = mix(neuralBase, mix(node, glow, 0.55), nearHub.mul(0.95));
+    const neuralCol = mix(neuralBase, mix(ivory, amber, 0.35), nearHub.mul(0.95));
 
-    const sawCold = color('#7eb8ff');
-    const sawWarm = color('#e8f0ff');
+    // Sierra · teal → marfil frío (complemento del ámbar)
+    const sawCold = mix(teal, color('#4a9aaa'), 0.35);
+    const sawWarm = mix(ivory, teal, 0.2);
     const sawCol = mix(sawCold, sawWarm, heightT);
 
-    // Blanco/crema → más oscuro hacia −Z y salida (look grabado)
+    // Torbellino · marfil → gris cálido → tinta (misma curva tonal)
     const funnelT = float(6.2).sub(pos.z).div(4.5).clamp(0.0, 1.0);
-    const inkWhite = color('#f2f0ea');
-    const inkGrey = color('#8a8680');
-    const inkBlack = color('#0a0a0a');
-    const maelCol = mix(inkWhite, mix(inkGrey, inkBlack, funnelT), funnelT.mul(0.75));
+    const warmGrey = color('#6e675f');
+    const maelCol = mix(ivory, mix(warmGrey, ink, funnelT), funnelT.mul(0.78));
 
     const e2c = params.layer2Enabled;
     const e3c = params.layer3Enabled;
@@ -577,10 +600,18 @@ export function createSimulation({ renderer, scene, params, count = 524288 }) {
     const cSum = max(e2c.add(e3c).add(e4c), 0.001);
     const structCol = neuralCol.mul(e2c).add(sawCol.mul(e3c)).add(maelCol.mul(e4c)).div(cSum);
     const base = mix(planeCol, structCol, min(e2c.add(e3c).add(e4c), float(1.0)));
-    return vec4(mix(base, hot, speedT.mul(0.12)), 1.0);
+
+    // Destello de velocidad (ámbar compartido) + boost para que el bloom lo recoja
+    const lit = mix(base, amber, speedT.mul(0.22));
+    const bloomBoost = float(1.0).add(speedT.mul(0.55));
+    return vec4(lit.mul(bloomBoost), 1.0);
   })();
 
-  material.opacityNode = step(uv().xy.sub(0.5).length(), 0.5);
+  // Glow suave (no círculo duro): cae en gaussiana → halo de luz
+  material.opacityNode = Fn(() => {
+    const d = uv().sub(0.5).length();
+    return exp(d.mul(d).mul(params.glowFalloff.mul(-1.0))).mul(0.95);
+  })();
 
   const geometry = new THREE.PlaneGeometry(1, 1);
   const mesh = new THREE.InstancedMesh(geometry, material, count);
